@@ -167,6 +167,13 @@ async def analyze_video(file: UploadFile = File(...)):
                 "Default": ["Focus on early preparation.", "Maintain a balanced 'ready position'."]
             }
 
+            tactical_analysis = {
+                "handedness": "Unknown",
+                "direction": "Unknown",
+                "intent": "Unknown",
+                "specific_type": action_label
+            }
+
             if gemini_enabled:
                 try:
                     prompt = (
@@ -175,17 +182,36 @@ async def analyze_video(file: UploadFile = File(...)):
                         f"- Stroke Type: {action_label}\n"
                         f"- Model Confidence: {confidence:.2f}\n"
                         f"- Execution Quality Score: {numeric_quality}/7 (7 is Elite, 1 is Beginner)\n\n"
-                        f"Provide 2-3 specific, concise, and professional technical cues/tips to help them improve. "
-                        f"Format as single-line bullet points without any introductory text."
+                        f"Provide the following in a structured format:\n"
+                        f"1. TACTICAL_METRICS: [Forehand/Backhand], [Straight/Cross-court/Body hit], [Specific Subtype], [Strategy/Intent]\n"
+                        f"2. COACH_TIPS: 2-3 specific, concise technical cues.\n\n"
+                        f"Format the metrics as a single comma-separated line after 'TACTICAL_METRICS:'. "
+                        f"Format tips as single-line bullet points after 'COACH_TIPS:'."
                     )
                     response = model_llm.generate_content(prompt)
-                    # Parse bullet points
-                    raw_tips = response.text.strip().split('\n')
-                    recommendations = [t.strip().lstrip('*-•').strip() for t in raw_tips if t.strip()]
-                    recommendations = recommendations[:3] # Limit to 3
-                    print(f"SUCCESS: Generated dynamic tips via Gemini 3.0 Flash for {action_label}.")
+                    text = response.text.strip()
+                    
+                    # Parse Tactical Metrics
+                    if "TACTICAL_METRICS:" in text:
+                        metrics_line = text.split("TACTICAL_METRICS:")[1].split('\n')[0].strip()
+                        parts = [p.strip() for p in metrics_line.split(',')]
+                        if len(parts) >= 4:
+                            tactical_analysis["handedness"] = parts[0]
+                            tactical_analysis["direction"] = parts[1]
+                            tactical_analysis["specific_type"] = parts[2]
+                            tactical_analysis["intent"] = parts[3]
+
+                    # Parse Coach Tips
+                    if "COACH_TIPS:" in text:
+                        tips_section = text.split("COACH_TIPS:")[1]
+                        raw_tips = tips_section.strip().split('\n')
+                        recommendations = [t.strip().lstrip('*-•').strip() for t in raw_tips if t.strip()][:3]
+                    else:
+                        recommendations = static_tips.get(action_label, static_tips["Default"])
+
+                    print(f"SUCCESS: Generated detailed tactical analysis via Gemini 3.0 Flash for {action_label}.")
                 except Exception as e:
-                    print(f"WARNING: Gemini generation failed: {e}. Using static tips.")
+                    print(f"WARNING: Gemini generation failed: {e}. Using static fallbacks.")
                     recommendations = static_tips.get(action_label, static_tips["Default"])
             else:
                 # Use static tips if Gemini not enabled
@@ -303,6 +329,7 @@ async def analyze_video(file: UploadFile = File(...)):
                 "quality_numeric": numeric_quality,
                 "quality_score": float(quality_prob[0, quality_idx].item()),
                 "recommendations": recommendations,
+                "tactical_analysis": tactical_analysis,
                 "timeline": timeline if timeline else None
             }
             

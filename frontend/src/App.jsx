@@ -225,34 +225,23 @@ export default function App() {
                         </div>
                     ) : result ? (
                         <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-3">
-                                {/* Stroke Type */}
+                            <div className="space-y-3">
+                                {/* Performance & Tactical Analysis */}
                                 <div className="p-4 bg-neutral-950 rounded-md border border-neutral-800">
-                                    <span className="text-xs text-neutral-500 block mb-1">Stroke Type</span>
-                                    <div className="text-lg font-semibold text-white break-words">{result.action}</div>
-                                    <div className="flex items-center gap-2 mt-2">
-                                        <div className="h-1 flex-1 bg-neutral-800 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-emerald-500 rounded-full"
-                                                style={{ width: `${result.confidence * 100}%` }}
-                                            />
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                            <span className="text-xs text-neutral-500 block mb-1">Execution Quality</span>
+                                            <div className={`text-xl font-bold ${getQualityColor(result.quality)}`}>
+                                                {result.quality}
+                                            </div>
                                         </div>
-                                        <span className="text-xs font-mono text-neutral-400">
-                                            {(result.confidence * 100).toFixed(0)}%
-                                        </span>
+                                        <div className="text-right">
+                                            <span className="text-xs font-mono text-neutral-400 block mb-1">Score</span>
+                                            <div className="text-lg font-semibold text-white">{result.quality_numeric || 0} / 7</div>
+                                        </div>
                                     </div>
-                                </div>
 
-                                {/* Quality */}
-                                <div className="p-4 bg-neutral-950 rounded-md border border-neutral-800">
-                                    <div className="flex justify-between items-start mb-1">
-                                        <span className="text-xs text-neutral-500">Execution Quality</span>
-                                        <span className="text-xs font-mono text-neutral-400">{result.quality_numeric || 0} / 7</span>
-                                    </div>
-                                    <div className={`text-lg font-semibold ${getQualityColor(result.quality)}`}>
-                                        {result.quality}
-                                    </div>
-                                    <div className="w-full bg-neutral-800 h-1.5 rounded-full mt-3 overflow-hidden">
+                                    <div className="w-full bg-neutral-800 h-1.5 rounded-full mb-6 overflow-hidden">
                                         <motion.div
                                             initial={{ width: 0 }}
                                             animate={{ width: `${((result.quality_numeric || 0) / 7) * 100}%` }}
@@ -260,6 +249,29 @@ export default function App() {
                                             className={`h-full rounded-full ${getQualityBarColor(result.quality)}`}
                                         />
                                     </div>
+
+                                    {result.tactical_analysis && (
+                                        <div className="pt-4 border-t border-neutral-800/50">
+                                            <span className="text-xs text-neutral-500 block mb-3">Tactical Metrics</span>
+                                            <div className="flex flex-wrap gap-2 mb-3">
+                                                <div className="px-2 py-1 bg-blue-500/10 border border-blue-500/30 rounded text-[10px] font-medium text-blue-400 flex items-center gap-1">
+                                                    <Icon name="pan_tool_alt" size={12} />
+                                                    {result.tactical_analysis.handedness}
+                                                </div>
+                                                <div className="px-2 py-1 bg-purple-500/10 border border-purple-500/30 rounded text-[10px] font-medium text-purple-400 flex items-center gap-1">
+                                                    <Icon name="explore" size={12} />
+                                                    {result.tactical_analysis.direction}
+                                                </div>
+                                                <div className="px-2 py-1 bg-amber-500/10 border border-amber-500/30 rounded text-[10px] font-medium text-amber-400 flex items-center gap-1">
+                                                    <Icon name="psychology" size={12} />
+                                                    {result.tactical_analysis.intent}
+                                                </div>
+                                            </div>
+                                            <div className="text-xs text-neutral-400 italic">
+                                                {result.tactical_analysis.specific_type}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
