@@ -40,5 +40,5 @@ wheels/
 htmlcov/
 
 backend/data
-
+backend/models
 frontend/node_modules
