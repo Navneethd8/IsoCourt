@@ -12,5 +12,5 @@ scipy
 pytest
 requests
 mediapipe
-google-generativeai
+google-genai
 python-dotenv

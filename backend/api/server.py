@@ -7,7 +7,7 @@ import torch
 import numpy as np
 import sys
 import base64
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 # Add parent directory to path to import model and dataset
@@ -25,11 +25,11 @@ if not GEMINI_API_KEY or GEMINI_API_KEY == "YOUR_API_KEY_HERE":
     gemini_enabled = False
 else:
     try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        # Use Gemini 3.0 Flash preview
-        model_llm = genai.GenerativeModel('gemini-3-flash-preview')
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        # Use Gemini 3.0 Flash Preview
+        model_name = 'gemini-3-flash-preview'
         gemini_enabled = True
-        print("SUCCESS: Gemini 3.0 Flash preview enabled for coaching feedback.")
+        print(f"SUCCESS: {model_name} enabled via google-genai SDK.")
     except Exception as e:
         print(f"ERROR: Failed to initialize Gemini: {e}")
         gemini_enabled = False
@@ -188,7 +188,7 @@ async def analyze_video(file: UploadFile = File(...)):
                         f"Format the metrics as a single comma-separated line after 'TACTICAL_METRICS:'. "
                         f"Format tips as single-line bullet points after 'COACH_TIPS:'."
                     )
-                    response = model_llm.generate_content(prompt)
+                    response = client.models.generate_content(model='gemini-3-flash-preview', contents=prompt)
                     text = response.text.strip()
                     
                     # Parse Tactical Metrics
