@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
+import Logo from './components/Logo';
 import { useDropzone } from 'react-dropzone'
 import axios from 'axios'
 import { motion } from 'framer-motion'
@@ -123,7 +124,7 @@ export default function App() {
             <div className="max-w-2xl mx-auto">
 
                 <header className="flex items-center gap-2 mb-8">
-                    <Icon name="sports_tennis" size={24} className="text-emerald-500" />
+                    <Logo size={24} className="text-emerald-500" />
                     <h1 className="text-xl font-semibold tracking-tight">
                         Bad<span className="text-emerald-500">Coach</span>
                     </h1>
