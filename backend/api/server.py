@@ -63,7 +63,6 @@ async def load_model():
     global model, pose_estimator, dataset_metadata
     
     # Initialize metadata from dataset class
-    # We use dummy paths just to get the class definition mappings
     dummy_root = os.path.join(os.path.dirname(__file__), "../data")
     dummy_json = os.path.join(dummy_root, "transformed_combined_rounds_output_en_evals_translated.json")
     
@@ -84,7 +83,23 @@ async def load_model():
     task_classes = {k: len(v) for k, v in dataset_metadata.items()}
     task_classes["quality"] = 7
     
-    model = CNN_LSTM_Model(task_classes=task_classes)
+    # Read hidden_size from model registry to match saved checkpoint
+    import json
+    hidden_size = 128 # default
+    registry_path = os.path.join(os.path.dirname(MODEL_PATH), "model_registry.json")
+    if os.path.exists(registry_path):
+        try:
+            with open(registry_path) as f:
+                registry = json.load(f)
+            model_name = os.path.basename(MODEL_PATH)
+            if model_name in registry.get("models", {}):
+                hidden_size = registry["models"][model_name].get("hidden_size", 128)
+                acc = registry["models"][model_name].get("accuracy", "?")
+                print(f"Registry: Loading {model_name} (accuracy={acc}%, hidden_size={hidden_size})")
+        except Exception as e:
+            print(f"Warning: Could not read model registry: {e}")
+    
+    model = CNN_LSTM_Model(task_classes=task_classes, hidden_size=hidden_size)
     
     if os.path.exists(MODEL_PATH):
         abs_path = os.path.abspath(MODEL_PATH)
@@ -99,6 +114,7 @@ async def load_model():
     else:
         print(f"CRITICAL: Model file NOT found at {os.path.abspath(MODEL_PATH)}.")
         sys.exit(1)
+
     
     model.to(device)
     model.eval()

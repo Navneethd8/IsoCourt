@@ -1,0 +1,74 @@
+Loading cached features from models/feature_cache_mtl.pt...
+
+Training Multi-Task Model (100 epochs)...
+Epoch   1 | Loss: 8.5753 | Type Acc: 12.6% | Pos Acc: 12.8% | LR: 0.000500
+  -> Saved best model (Type Acc: 12.6%)
+Epoch   2 | Loss: 8.2519 | Type Acc: 13.6% | Pos Acc: 17.7% | LR: 0.000500
+  -> Saved best model (Type Acc: 13.6%)
+Epoch   3 | Loss: 8.1628 | Type Acc: 16.7% | Pos Acc: 15.5% | LR: 0.000500
+  -> Saved best model (Type Acc: 16.7%)
+Epoch   5 | Loss: 8.2157 | Type Acc: 12.8% | Pos Acc: 13.1% | LR: 0.000500
+Epoch   8 | Loss: 8.1201 | Type Acc: 17.7% | Pos Acc: 21.1% | LR: 0.000500
+  -> Saved best model (Type Acc: 17.7%)
+Epoch  10 | Loss: 8.1311 | Type Acc: 16.7% | Pos Acc: 15.7% | LR: 0.000500
+Epoch  11 | Loss: 8.1039 | Type Acc: 18.4% | Pos Acc: 16.5% | LR: 0.000500
+  -> Saved best model (Type Acc: 18.4%)
+Epoch  12 | Loss: 7.9291 | Type Acc: 20.8% | Pos Acc: 20.8% | LR: 0.000500
+  -> Saved best model (Type Acc: 20.8%)
+Epoch  14 | Loss: 7.9748 | Type Acc: 22.3% | Pos Acc: 23.0% | LR: 0.000500
+  -> Saved best model (Type Acc: 22.3%)
+Epoch  15 | Loss: 7.8893 | Type Acc: 18.9% | Pos Acc: 23.5% | LR: 0.000500
+Epoch  17 | Loss: 7.7517 | Type Acc: 22.5% | Pos Acc: 26.6% | LR: 0.000500
+  -> Saved best model (Type Acc: 22.5%)
+Epoch  19 | Loss: 7.6862 | Type Acc: 23.2% | Pos Acc: 28.8% | LR: 0.000500
+  -> Saved best model (Type Acc: 23.2%)
+Epoch  20 | Loss: 7.7359 | Type Acc: 23.7% | Pos Acc: 26.6% | LR: 0.000500
+  -> Saved best model (Type Acc: 23.7%)
+Epoch  21 | Loss: 7.5984 | Type Acc: 25.9% | Pos Acc: 31.2% | LR: 0.000500
+  -> Saved best model (Type Acc: 25.9%)
+Epoch  25 | Loss: 7.5344 | Type Acc: 26.9% | Pos Acc: 31.0% | LR: 0.000500
+  -> Saved best model (Type Acc: 26.9%)
+Epoch  26 | Loss: 7.4115 | Type Acc: 30.5% | Pos Acc: 36.3% | LR: 0.000500
+  -> Saved best model (Type Acc: 30.5%)
+Epoch  30 | Loss: 7.4492 | Type Acc: 28.1% | Pos Acc: 31.0% | LR: 0.000500
+Epoch  31 | Loss: 7.3794 | Type Acc: 31.5% | Pos Acc: 35.4% | LR: 0.000500
+  -> Saved best model (Type Acc: 31.5%)
+Epoch  33 | Loss: 7.3631 | Type Acc: 32.0% | Pos Acc: 32.9% | LR: 0.000500
+  -> Saved best model (Type Acc: 32.0%)
+Epoch  34 | Loss: 7.1811 | Type Acc: 33.7% | Pos Acc: 37.3% | LR: 0.000500
+  -> Saved best model (Type Acc: 33.7%)
+Epoch  35 | Loss: 7.0856 | Type Acc: 34.1% | Pos Acc: 38.7% | LR: 0.000500
+  -> Saved best model (Type Acc: 34.1%)
+Epoch  38 | Loss: 7.1306 | Type Acc: 35.1% | Pos Acc: 37.3% | LR: 0.000500
+  -> Saved best model (Type Acc: 35.1%)
+Epoch  39 | Loss: 6.9164 | Type Acc: 39.0% | Pos Acc: 40.7% | LR: 0.000500
+  -> Saved best model (Type Acc: 39.0%)
+Epoch  40 | Loss: 6.9361 | Type Acc: 37.5% | Pos Acc: 42.4% | LR: 0.000500
+Epoch  43 | Loss: 6.9568 | Type Acc: 42.9% | Pos Acc: 37.0% | LR: 0.000500
+  -> Saved best model (Type Acc: 42.9%)
+Epoch  45 | Loss: 6.8384 | Type Acc: 40.7% | Pos Acc: 41.2% | LR: 0.000500
+Epoch  50 | Loss: 6.7191 | Type Acc: 41.4% | Pos Acc: 44.6% | LR: 0.000500
+Epoch  54 | Loss: 6.5460 | Type Acc: 48.2% | Pos Acc: 43.8% | LR: 0.000500
+  -> Saved best model (Type Acc: 48.2%)
+Epoch  55 | Loss: 6.3542 | Type Acc: 50.6% | Pos Acc: 48.2% | LR: 0.000500
+  -> Saved best model (Type Acc: 50.6%)
+Epoch  60 | Loss: 6.4026 | Type Acc: 50.4% | Pos Acc: 48.4% | LR: 0.000500
+Epoch  65 | Loss: 6.1827 | Type Acc: 51.3% | Pos Acc: 52.1% | LR: 0.000250
+  -> Saved best model (Type Acc: 51.3%)
+Epoch  69 | Loss: 6.2211 | Type Acc: 52.1% | Pos Acc: 53.3% | LR: 0.000250
+  -> Saved best model (Type Acc: 52.1%)
+Epoch  70 | Loss: 6.2724 | Type Acc: 48.4% | Pos Acc: 53.3% | LR: 0.000250
+Epoch  73 | Loss: 6.0807 | Type Acc: 53.8% | Pos Acc: 55.4% | LR: 0.000125
+  -> Saved best model (Type Acc: 53.8%)
+Epoch  75 | Loss: 6.2140 | Type Acc: 48.2% | Pos Acc: 52.8% | LR: 0.000125
+Epoch  78 | Loss: 6.0410 | Type Acc: 56.4% | Pos Acc: 53.8% | LR: 0.000125
+  -> Saved best model (Type Acc: 56.4%)
+Epoch  80 | Loss: 6.1021 | Type Acc: 51.3% | Pos Acc: 53.0% | LR: 0.000125
+Epoch  85 | Loss: 6.0569 | Type Acc: 50.1% | Pos Acc: 56.9% | LR: 0.000125
+Epoch  90 | Loss: 5.9923 | Type Acc: 50.1% | Pos Acc: 61.0% | LR: 0.000063
+Epoch  95 | Loss: 5.9519 | Type Acc: 53.3% | Pos Acc: 55.9% | LR: 0.000063
+Epoch  98 | Loss: 5.9971 | Type Acc: 56.9% | Pos Acc: 58.1% | LR: 0.000063
+  -> Saved best model (Type Acc: 56.9%)
+Epoch 100 | Loss: 5.8957 | Type Acc: 54.7% | Pos Acc: 57.9% | LR: 0.000031
+
+Training finished! Best stroke_type accuracy: 56.9%

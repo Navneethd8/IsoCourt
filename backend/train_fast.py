@@ -29,9 +29,14 @@ def extract_and_train(
     batch_size=8, 
     lr=0.001, 
     device="cpu",
-    save_path="models/badminton_model.pth",
-    cache_path="models/feature_cache_mtl.pt"
+    save_path=None,
+    cache_path=None
 ):
+    _dir = os.path.dirname(os.path.abspath(__file__))
+    if save_path is None:
+        save_path = os.path.join(_dir, "models", "badminton_model.pth")
+    if cache_path is None:
+        cache_path = os.path.join(_dir, "models", "feature_cache_mtl.pt")
     # Step 1: Feature Extraction
     if os.path.exists(cache_path):
         print(f"Loading cached features from {cache_path}...")
@@ -81,26 +86,42 @@ def extract_and_train(
             'task_classes': task_classes
         }, cache_path)
     
-    # Step 2: MTL Training
+    # Step 2: MTL Training with Train/Val Split
     print(f"\nTraining Multi-Task Model ({epochs} epochs)...")
     
-    # --- WeightedRandomSampler for Class Balance ---
-    # We use stroke_type as the primary task for balancing
-    st_labels = all_labels["stroke_type"]
+    # --- 80/20 Train/Val Split ---
+    num_samples = all_features.shape[0]
+    indices = torch.randperm(num_samples)
+    split = int(0.8 * num_samples)
+    train_idx, val_idx = indices[:split], indices[split:]
+    
+    train_features = all_features[train_idx]
+    val_features = all_features[val_idx]
+    train_labels = {k: v[train_idx] for k, v in all_labels.items()}
+    val_labels = {k: v[val_idx] for k, v in all_labels.items()}
+    
+    print(f"Split: {len(train_idx)} train / {len(val_idx)} val samples")
+    
+    # --- WeightedRandomSampler for Class Balance (train only) ---
+    st_labels = train_labels["stroke_type"]
     class_counts = torch.bincount(st_labels)
-    # Give higher weight to minority classes
     class_weights = 1. / (class_counts.float() + 1e-6)
     sample_weights = class_weights[st_labels]
     
     from torch.utils.data import WeightedRandomSampler
     sampler = WeightedRandomSampler(weights=sample_weights, num_samples=len(sample_weights), replacement=True)
     
-    # Set num_workers to 0 for stability on macOS
     num_workers = 0
-    dataloader = DataLoader(
-        CachedFeatureDataset(all_features, all_labels), 
+    train_loader = DataLoader(
+        CachedFeatureDataset(train_features, train_labels), 
         batch_size=batch_size, 
         sampler=sampler, 
+        num_workers=num_workers
+    )
+    val_loader = DataLoader(
+        CachedFeatureDataset(val_features, val_labels),
+        batch_size=batch_size,
+        shuffle=False,
         num_workers=num_workers
     )
     
@@ -127,24 +148,21 @@ def extract_and_train(
     
     best_acc = 0.0
     for epoch in range(epochs):
+        # --- Training Phase ---
         lstm.train()
         heads.train()
         running_loss = 0.0
-        task_correct = {task: 0 for task in task_classes.keys()}
-        total = 0
         
-        for features, labels in dataloader:
+        for features, labels in train_loader:
             features = features.to(device)
             
-            # --- Feature Data Augmentation ---
-            # Add subtle Gaussian noise to help generalization
+            # Feature Data Augmentation
             if lstm.training:
                 noise = torch.randn_like(features) * 0.01 
                 features = features + noise
             
             lstm_out, (h_n, c_n) = lstm(features)
             
-            # Temporal Global Pooling
             avg_pool = torch.mean(lstm_out, dim=1)
             max_pool, _ = torch.max(lstm_out, dim=1)
             final_feature = torch.cat([avg_pool, max_pool], dim=1)
@@ -159,27 +177,46 @@ def extract_and_train(
                 
                 weight = 1.0 if task in ["stroke_type", "quality", "position"] else 0.3
                 total_loss += weight * loss
-                
-                pred = torch.argmax(logits, dim=1)
-                task_correct[task] += (pred == task_labels).sum().item()
-                if task == "stroke_type":
-                    total += task_labels.size(0)
 
             optimizer.zero_grad()
             total_loss.backward()
             optimizer.step()
             running_loss += total_loss.item()
 
-        epoch_loss = running_loss / len(dataloader)
-        epoch_acc = 100 * task_correct["stroke_type"] / total
+        epoch_loss = running_loss / len(train_loader)
         scheduler.step(epoch_loss)
         
-        if (epoch + 1) % 5 == 0 or epoch_acc > best_acc:
-            pos_acc = 100 * task_correct["position"] / total
-            print(f"Epoch {epoch+1:3d} | Loss: {epoch_loss:.4f} | Type Acc: {epoch_acc:.1f}% | Pos Acc: {pos_acc:.1f}% | LR: {optimizer.param_groups[0]['lr']:.6f}")
+        # --- Validation Phase ---
+        lstm.eval()
+        heads.eval()
+        val_correct = {task: 0 for task in task_classes.keys()}
+        val_total = 0
+        
+        with torch.no_grad():
+            for features, labels in val_loader:
+                features = features.to(device)
+                lstm_out, _ = lstm(features)
+                
+                avg_pool = torch.mean(lstm_out, dim=1)
+                max_pool, _ = torch.max(lstm_out, dim=1)
+                final_feature = torch.cat([avg_pool, max_pool], dim=1)
+                
+                for task, task_labels in labels.items():
+                    task_labels = task_labels.to(device)
+                    logits = heads[task](final_feature)
+                    pred = torch.argmax(logits, dim=1)
+                    val_correct[task] += (pred == task_labels).sum().item()
+                    if task == "stroke_type":
+                        val_total += task_labels.size(0)
+        
+        val_acc = 100 * val_correct["stroke_type"] / val_total
+        val_pos = 100 * val_correct["position"] / val_total
+        
+        if (epoch + 1) % 5 == 0 or val_acc > best_acc:
+            print(f"Epoch {epoch+1:3d} | Loss: {epoch_loss:.4f} | Val Type Acc: {val_acc:.1f}% | Val Pos Acc: {val_pos:.1f}% | LR: {optimizer.param_groups[0]['lr']:.6f}")
 
-        if epoch_acc > best_acc:
-            best_acc = epoch_acc
+        if val_acc > best_acc:
+            best_acc = val_acc
             # Save as full model
             full_model = CNN_LSTM_Model(task_classes=task_classes, hidden_size=hidden_size)
             full_model.lstm.load_state_dict(lstm.state_dict())
@@ -187,6 +224,28 @@ def extract_and_train(
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             torch.save(full_model.state_dict(), save_path)
             print(f"  -> Saved best model (Type Acc: {best_acc:.1f}%)")
+            
+            # Update Model Registry
+            import json, datetime
+            registry_path = os.path.join(os.path.dirname(save_path), "model_registry.json")
+            try:
+                with open(registry_path, "r") as f:
+                    registry = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                registry = {"models": {}, "active_model": None}
+            
+            model_name = os.path.basename(save_path)
+            registry["models"][model_name] = {
+                "accuracy": round(best_acc, 2),
+                "epoch": epoch + 1,
+                "hidden_size": hidden_size,
+                "timestamp": datetime.datetime.now().isoformat(),
+                "script": "train_fast.py"
+            }
+            registry["active_model"] = model_name
+            with open(registry_path, "w") as f:
+                json.dump(registry, f, indent=2)
+
 
     print(f"\nTraining finished! Best stroke_type accuracy: {best_acc:.1f}%")
 

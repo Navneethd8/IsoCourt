@@ -181,11 +181,16 @@ class FineBadmintonDataset(Dataset):
 
     def _load_image_frames_as_list(self, video_base: str, start_frame: int, end_frame: int) -> List[torch.Tensor]:
         # Implementation of frame loading as a list of Tensors
+        # Images are flat files: {video_base}_{frame_idx}.jpg
         frames = []
-        indices = np.linspace(start_frame, end_frame, self.sequence_length).astype(int)
+        duration = end_frame - start_frame
+        if duration <= 0:
+            return [torch.zeros((3, 224, 224)) for _ in range(self.sequence_length)]
+            
+        indices = np.linspace(start_frame, end_frame - 1, self.sequence_length).astype(int)
         
         abs_data_root = os.path.abspath(self.data_root)
-        image_dir = os.path.join(abs_data_root, "image") # Expected structure: data/image/VIDEO_NAME/FRAME_IDX.jpg
+        image_dir = os.path.join(abs_data_root, "image")
         
         # Search for image dir if not found in root
         if not os.path.exists(image_dir):
@@ -199,7 +204,7 @@ class FineBadmintonDataset(Dataset):
                     break
 
         for idx in indices:
-            img_path = os.path.join(image_dir, video_base, f"{idx:06d}.jpg")
+            img_path = os.path.join(image_dir, f"{video_base}_{idx}.jpg")
             if os.path.exists(img_path):
                 img = cv2.imread(img_path)
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
