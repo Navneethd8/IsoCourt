@@ -3,8 +3,7 @@ import Logo from './components/Logo';
 import { useDropzone } from 'react-dropzone'
 import axios from 'axios'
 import { motion } from 'framer-motion'
-// Analytics moved to main.jsx
-import { track } from "@vercel/analytics"
+import ReactGA from "react-ga4"
 
 function Icon({ name, size = 20, className = '' }) {
     return (
@@ -92,13 +91,12 @@ export default function App() {
                     validation_details: response.data.validation_details
                 })
             } else {
-                setResult(response.data)
                 // Track usage
-                track('Clip Analyzed', {
-                    quality_score: response.data.quality_numeric,
-                    quality_label: response.data.quality_label,
-                    stroke_type: response.data.stroke_type?.label || 'Unknown',
-                    duration: videoRef.current?.duration
+                ReactGA.event({
+                    category: "Video",
+                    action: "Clip Analyzed",
+                    label: response.data.quality_label,
+                    value: response.data.quality_numeric
                 });
             }
         } catch (error) {
