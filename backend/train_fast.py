@@ -41,7 +41,7 @@ def extract_and_train(
     if os.path.exists(cache_path):
         print(f"Loading cached features from {cache_path}...")
         # Load to CPU first for compatibility with multiprocessing
-        cache = torch.load(cache_path, map_location="cpu")
+        cache = torch.load(cache_path, map_location="cpu", weights_only=False)
         all_features = cache['features']
         all_labels = cache['labels']
         task_classes = cache['task_classes']
@@ -51,10 +51,29 @@ def extract_and_train(
         task_classes = {k: len(v) for k, v in dataset.classes.items()}
         task_classes["quality"] = 7
         
-        resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
-        modules = list(resnet.children())[:-1]
-        cnn = nn.Sequential(*modules).to(device)
-        cnn.eval()
+        # Load the trained CNN backbone from badminton_model.pth
+        print("Loading trained CNN backbone from badminton_model.pth...")
+        from model import CNN_LSTM_Model
+        
+        # Load the full trained model
+        model_path = os.path.join(os.path.dirname(cache_path), "badminton_model.pth")
+        full_model = CNN_LSTM_Model(task_classes=task_classes, hidden_size=128)
+        
+        try:
+            state_dict = torch.load(model_path, map_location=device, weights_only=False)
+            full_model.load_state_dict(state_dict, strict=False)
+            print(f"✓ Loaded trained model from {model_path}")
+        except Exception as e:
+            print(f"⚠ Warning: Could not load trained model ({e}), falling back to ImageNet ResNet50")
+            resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+            modules = list(resnet.children())[:-1]
+            cnn = nn.Sequential(*modules).to(device)
+            cnn.eval()
+        else:
+            # Extract just the CNN backbone (not LSTM or heads)
+            cnn = full_model.cnn.to(device)
+            cnn.eval()
+            print("✓ Using trained CNN backbone for feature extraction")
         
         all_features = []
         # Initialize label storage
@@ -76,8 +95,20 @@ def extract_and_train(
                 all_labels[k].append(v)
         
         all_features = torch.stack(all_features)
+        
+        # Filter out tasks with no labels
+        tasks_to_remove = []
         for k in all_labels:
-            all_labels[k] = torch.stack(all_labels[k])
+            if len(all_labels[k]) > 0:
+                all_labels[k] = torch.stack(all_labels[k])
+            else:
+                print(f"⚠ Warning: No labels found for task '{k}', removing from task_classes")
+                tasks_to_remove.append(k)
+        
+        # Remove empty tasks
+        for k in tasks_to_remove:
+            del task_classes[k]
+            del all_labels[k]
             
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
         torch.save({

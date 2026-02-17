@@ -31,8 +31,8 @@ export default function App() {
         { icon: 'rate_review', label: 'Generating feedback' },
     ]
 
-    // Weighted distribution: frame splitting is fast, pose tracing is the bulk
-    const stepWeights = [0.10, 0.50, 0.30, 0.10]
+    // Weighted distribution: frame splitting is fast, pose tracing and stroke analysis are the bulk
+    const stepWeights = [0.10, 0.35, 0.45, 0.10]
 
     const startLoadingSteps = () => {
         // Get video duration from the element
@@ -81,11 +81,31 @@ export default function App() {
             const response = await axios.post(`${apiUrl}/analyze`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             })
-            setResult(response.data)
+
+            // Check if validation failed
+            if (response.data.validation_failed) {
+                setResult({
+                    validation_error: true,
+                    error_message: response.data.error,
+                    validation_details: response.data.validation_details
+                })
+            } else {
+                setResult(response.data)
+            }
         } catch (error) {
             console.error("Error uploading file:", error)
-            const errorMessage = error.response?.data?.detail || error.message || "Error analyzing video"
-            alert(`Analysis failed: ${errorMessage}`)
+
+            // Check if it's a validation error from the backend
+            if (error.response?.data?.validation_failed) {
+                setResult({
+                    validation_error: true,
+                    error_message: error.response.data.error,
+                    validation_details: error.response.data.validation_details
+                })
+            } else {
+                const errorMessage = error.response?.data?.detail || error.message || "Error analyzing video"
+                alert(`Analysis failed: ${errorMessage}`)
+            }
         } finally {
             setLoading(false)
             stopLoadingSteps()
@@ -109,15 +129,25 @@ export default function App() {
     }
 
     const getQualityColor = (quality) => {
-        if (quality.includes('6') || quality.includes('7')) return 'text-green-400'
-        if (quality.includes('3') || quality.includes('4') || quality.includes('5')) return 'text-yellow-400'
-        return 'text-red-400'
+        // Updated for 10-point scale
+        const q = String(quality).toLowerCase()
+        if (q.includes('elite') || q.includes('expert')) return 'text-emerald-400'
+        if (q.includes('advanced')) return 'text-emerald-500' // New cyan/emerald
+        if (q.includes('proficient')) return 'text-cyan-400'
+        if (q.includes('competent')) return 'text-amber-400'
+        if (q.includes('developing') || q.includes('emerging')) return 'text-orange-400'
+        return 'text-rose-400'
     }
 
     const getQualityBarColor = (quality) => {
-        if (quality.includes('6') || quality.includes('7')) return 'bg-green-500'
-        if (quality.includes('3') || quality.includes('4') || quality.includes('5')) return 'bg-yellow-500'
-        return 'bg-red-500'
+        // Updated for 10-point scale
+        const q = String(quality).toLowerCase()
+        if (q.includes('elite') || q.includes('expert')) return 'bg-emerald-500'
+        if (q.includes('advanced')) return 'bg-emerald-600'
+        if (q.includes('proficient')) return 'bg-cyan-500'
+        if (q.includes('competent')) return 'bg-amber-500'
+        if (q.includes('developing') || q.includes('emerging')) return 'bg-orange-500'
+        return 'bg-rose-500'
     }
 
     return (
@@ -225,6 +255,61 @@ export default function App() {
                                 })}
                             </div>
                         </div>
+                    ) : result?.validation_error ? (
+                        <div className="py-8 px-4">
+                            <div className="bg-red-950/30 border border-red-900/50 rounded-lg p-6">
+                                <div className="flex items-start gap-4">
+                                    <div className="flex-shrink-0">
+                                        <Icon name="error" size={32} className="text-red-500" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="text-lg font-semibold text-red-400 mb-2">Not a Badminton Video</h3>
+                                        <p className="text-sm text-neutral-300 mb-4">
+                                            {result.error_message}
+                                        </p>
+
+                                        {result.validation_details && (
+                                            <div className="mt-4 p-3 bg-neutral-950/50 rounded border border-neutral-800">
+                                                <span className="text-xs text-neutral-500 block mb-2">Detection Details</span>
+                                                <div className="space-y-1.5 text-xs">
+                                                    {result.validation_details.pose_confidence !== undefined && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-neutral-400">Pose Detection Score:</span>
+                                                            <span className={result.validation_details.pose_confidence > 0.3 ? 'text-green-400' : 'text-red-400'}>
+                                                                {(result.validation_details.pose_confidence * 100).toFixed(1)}%
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {result.validation_details.model_confidence !== undefined && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-neutral-400">Model Confidence:</span>
+                                                            <span className={result.validation_details.model_confidence > 0.5 ? 'text-green-400' : 'text-red-400'}>
+                                                                {(result.validation_details.model_confidence * 100).toFixed(1)}%
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {result.validation_details.overhead_score !== undefined && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-neutral-400">Overhead Motion:</span>
+                                                            <span className={result.validation_details.overhead_score > 0.3 ? 'text-green-400' : 'text-red-400'}>
+                                                                {(result.validation_details.overhead_score * 100).toFixed(1)}%
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <button
+                                            onClick={() => { setResult(null); setFile(null); setPreview(null); }}
+                                            className="mt-4 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white text-sm rounded transition-colors"
+                                        >
+                                            Try Another Video
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     ) : result ? (
                         <div className="space-y-4">
                             <div className="space-y-3">
@@ -239,14 +324,14 @@ export default function App() {
                                         </div>
                                         <div className="text-right">
                                             <span className="text-xs font-mono text-neutral-400 block mb-1">Score</span>
-                                            <div className="text-lg font-semibold text-white">{result.quality_numeric || 0} / 7</div>
+                                            <div className="text-lg font-semibold text-white">{result.quality_numeric || 0} / 10</div>
                                         </div>
                                     </div>
 
                                     <div className="w-full bg-neutral-800 h-1.5 rounded-full mb-6 overflow-hidden">
                                         <motion.div
                                             initial={{ width: 0 }}
-                                            animate={{ width: `${((result.quality_numeric || 0) / 7) * 100}%` }}
+                                            animate={{ width: `${((result.quality_numeric || 0) / 10) * 100}%` }}
                                             transition={{ duration: 0.8, ease: "easeOut" }}
                                             className={`h-full rounded-full ${getQualityBarColor(result.quality)}`}
                                         />

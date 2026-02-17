@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torchvision import models
 import os
 
-MODEL_VERSION = "V2.1_POOLING_MLP"
+MODEL_VERSION = "V2.3_TEMPORAL_OPTIMIZED"
 
 class CNN_LSTM_Model(nn.Module):
     def __init__(self, task_classes=None, hidden_size=128, num_layers=1, pretrained=True):
@@ -97,7 +97,7 @@ class CNN_LSTM_Model(nn.Module):
 
 if __name__ == "__main__":
     task_classes = {
-        "stroke_type": 9, "stroke_subtype": 21, "technique": 4, 
+        "stroke_type": 9, "stroke_subtype": 21, "technique": 4,
         "placement": 7, "position": 10, "intent": 10, "quality": 7
     }
     model = CNN_LSTM_Model(task_classes=task_classes)

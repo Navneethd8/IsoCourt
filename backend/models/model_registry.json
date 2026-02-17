@@ -1,17 +1,17 @@
 {
   "models": {
     "badminton_model.pth": {
-      "accuracy": 43.37,
-      "epoch": 98,
+      "accuracy": 40.96,
+      "epoch": 100,
       "hidden_size": 128,
-      "timestamp": "2026-02-15T22:25:33.926822",
+      "timestamp": "2026-02-16T22:36:46.273846",
       "script": "train_fast.py"
     },
     "badminton_model_full.pth": {
       "accuracy": 24.1,
-      "epoch": 29,
+      "epoch": 30,
       "hidden_size": 128,
-      "timestamp": "2026-02-15T22:17:19.549077",
+      "timestamp": "2026-02-16T22:31:53.274303",
       "script": "train_full.py"
     }
   },

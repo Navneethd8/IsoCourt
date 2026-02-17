@@ -16,6 +16,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from model import CNN_LSTM_Model
 from dataset import FineBadmintonDataset
 from pose_utils import PoseEstimator
+from badminton_detector import BadmintonPoseDetector
 
 # Load and validate environment variables
 load_dotenv()
@@ -56,11 +57,12 @@ if not os.path.exists(MODEL_PATH):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = None
 pose_estimator = None
+badminton_detector = None
 dataset_metadata = None
 
 @app.on_event("startup")
 async def load_model():
-    global model, pose_estimator, dataset_metadata
+    global model, pose_estimator, badminton_detector, dataset_metadata
     
     # Initialize metadata from dataset class
     dummy_root = os.path.join(os.path.dirname(__file__), "../data")
@@ -120,7 +122,8 @@ async def load_model():
     model.eval()
     
     pose_estimator = PoseEstimator()
-    print("Pose Estimator initialized.")
+    badminton_detector = BadmintonPoseDetector()
+    print("Pose Estimator and Badminton Detector initialized.")
 
 def process_segment(cap, start_frame, end_frame, sequence_length=16):
     """Extract frames and pose for a specific video segment."""
@@ -196,7 +199,48 @@ async def analyze_video(file: UploadFile = File(...)):
     
     if total_frames == 0:
         if os.path.exists(temp_file): os.remove(temp_file)
-        return {"error": "Could not read video frames"}
+        return {"error": "Could not read video frames", "validation_failed": True}
+    
+    # STAGE 1: MediaPipe Pose-Based Validation
+    print("Stage 1: Analyzing poses for badminton characteristics...")
+    sys.stdout.flush()
+    
+    # Sample frames for pose analysis (every 10th frame, max 30 frames)
+    sample_indices = list(range(0, total_frames, max(1, total_frames // 30)))[:30]
+    pose_landmarks_list = []
+    
+    for idx in sample_indices:
+        raw_frame = all_frames_raw[idx]
+        p_results = pose_estimator.process_frame(raw_frame)
+        landmarks = pose_estimator.get_landmarks_as_list(p_results)
+        if landmarks:
+            pose_landmarks_list.append(landmarks[0])  # First person detected
+        else:
+            pose_landmarks_list.append([])
+    
+    is_badminton_pose, pose_confidence, pose_details = badminton_detector.is_badminton_video(
+        pose_landmarks_list, threshold=0.05  # Very permissive - only reject obvious non-badminton
+    )
+    
+    print(f"Pose Analysis: is_badminton={is_badminton_pose}, confidence={pose_confidence:.3f}")
+    print(f"Details: {pose_details}")
+    sys.stdout.flush()
+    
+    # If pose analysis strongly suggests not badminton, reject early
+    # Only reject if confidence is EXTREMELY low (< 0.05)
+    if not is_badminton_pose and pose_confidence < 0.05:
+        if os.path.exists(temp_file): os.remove(temp_file)
+        return {
+            "error": "This doesn't appear to be a badminton video. Please upload a video showing badminton gameplay with visible players and racket movements.",
+            "validation_failed": True,
+            "validation_details": {
+                "stage": "pose_analysis",
+                "pose_confidence": pose_confidence,
+                "overhead_score": pose_details.get("overhead_score", 0.0),
+                "racket_score": pose_details.get("racket_score", 0.0),
+                "stance_score": pose_details.get("stance_score", 0.0)
+            }
+        }
         
     timeline = []
     
@@ -248,9 +292,30 @@ async def analyze_video(file: UploadFile = File(...)):
                     conf = probs[0, idx].item()
                     
                     if task == "quality":
-                        seg_results["quality_numeric"] = idx + 1
-                        q_map = {1: "Developing", 2: "Emerging", 3: "Competent", 4: "Proficient", 5: "Advanced", 6: "Expert", 7: "Elite"}
-                        seg_results["quality_label"] = q_map.get(idx + 1, "Unknown")
+                        # Map 7 model classes to 10-point scale for better granularity
+                        # 1->1-2, 2->3, 3->4-5, 4->6, 5->7-8, 6->9, 7->10
+                        quality_map_to_10 = {
+                            0: 1,   # Developing -> 1-2
+                            1: 3,   # Emerging -> 3
+                            2: 5,   # Competent -> 4-5
+                            3: 6,   # Proficient -> 6
+                            4: 8,   # Advanced -> 7-8
+                            5: 9,   # Expert -> 9
+                            6: 10   # Elite -> 10
+                        }
+                        seg_results["quality_numeric"] = quality_map_to_10.get(idx, 5)
+                        
+                        # Updated labels for 10-point scale
+                        q_map = {
+                            1: "Beginner", 2: "Beginner+", 3: "Developing", 
+                            4: "Competent", 5: "Competent+", 6: "Proficient",
+                            7: "Advanced", 8: "Advanced+", 9: "Expert", 10: "Elite"
+                        }
+                        seg_results["quality_label"] = q_map.get(seg_results["quality_numeric"], "Unknown")
+                    elif task == "is_badminton":
+                        # Store is_badminton prediction for validation
+                        seg_results["is_badminton_conf"] = conf
+                        seg_results["is_badminton_pred"] = idx  # 0=not_badminton, 1=badminton
                     else:
                         seg_results[task] = {
                             "label": dataset_metadata[task][idx],
@@ -262,6 +327,8 @@ async def analyze_video(file: UploadFile = File(...)):
                     "label": seg_results["stroke_type"]["label"],
                     "confidence": seg_results["stroke_type"]["confidence"],
                     "pose_image": pose_b64,
+                    "is_badminton_conf": seg_results.get("is_badminton_conf", 1.0),
+                    "is_badminton_pred": seg_results.get("is_badminton_pred", 1),
                     "metrics": {
                         "subtype": seg_results.get("stroke_subtype", {"label": "None", "confidence": 0.0}),
                         "technique": seg_results.get("technique", {"label": "Unknown", "confidence": 0.0}),
@@ -273,6 +340,52 @@ async def analyze_video(file: UploadFile = File(...)):
                 })
 
         print(f"Analysis complete. Found {len(timeline)} segments.")
+        sys.stdout.flush()
+        
+        # STAGE 2: Model-Based Binary Classification Validation
+        print("Stage 2: Validating badminton classification from model...")
+        sys.stdout.flush()
+        
+        # Calculate average is_badminton confidence across all segments
+        badminton_confidences = [seg.get("is_badminton_conf", 0.0) for seg in timeline]
+        badminton_predictions = [seg.get("is_badminton_pred", 0) for seg in timeline]
+        
+        avg_badminton_conf = np.mean(badminton_confidences) if badminton_confidences else 0.0
+        badminton_ratio = sum(badminton_predictions) / len(badminton_predictions) if badminton_predictions else 0.0
+        
+        print(f"Model Classification: avg_confidence={avg_badminton_conf:.3f}, badminton_ratio={badminton_ratio:.3f}")
+        sys.stdout.flush()
+        
+        # Combined validation: require either high pose score OR high model confidence
+        # This allows flexibility for different video qualities
+        pose_passed = pose_confidence >= 0.30
+        model_passed = badminton_ratio >= 0.5 and avg_badminton_conf >= 0.50
+        
+        if not (pose_passed or model_passed):
+            if os.path.exists(temp_file): os.remove(temp_file)
+            
+            # Provide specific feedback based on what failed
+            if pose_confidence < 0.20 and badminton_ratio < 0.3:
+                error_msg = "This video doesn't show badminton gameplay. Please upload a video with visible badminton players, racket movements, and court action."
+            elif pose_confidence < 0.30:
+                error_msg = "Unable to detect badminton-specific movements (overhead strokes, lunges, racket swings). Please ensure the video clearly shows players in action."
+            else:
+                error_msg = "The video content doesn't match badminton gameplay patterns. Please upload a clear badminton match or practice video."
+            
+            return {
+                "error": error_msg,
+                "validation_failed": True,
+                "validation_details": {
+                    "stage": "model_classification",
+                    "pose_confidence": pose_confidence,
+                    "model_confidence": avg_badminton_conf,
+                    "badminton_ratio": badminton_ratio,
+                    "pose_passed": pose_passed,
+                    "model_passed": model_passed
+                }
+            }
+        
+        print("Validation passed! Proceeding with full analysis...")
         sys.stdout.flush()
 
         # 2. Pick Global Best
@@ -288,10 +401,50 @@ async def analyze_video(file: UploadFile = File(...)):
             confidence = best_event["confidence"]
             metrics = best_event["metrics"]
             quality_label = metrics["quality"]
-            q_rev = {"Developing":1, "Emerging":2, "Competent":3, "Proficient":4, "Advanced":5, "Expert":6, "Elite":7}
-            numeric_quality = q_rev.get(quality_label, 3)
+            # Updated reverse mapping for 10-point scale
+            q_rev = {
+                "Beginner": 1, "Beginner+": 2, "Developing": 3, 
+                "Competent": 4, "Competent+": 5, "Proficient": 6,
+                "Advanced": 7, "Advanced+": 8, "Expert": 9, "Elite": 10
+            }
+            # If label not found (e.g. old labels), default to 5 (Competent+)
+            numeric_quality = q_rev.get(quality_label, 5)
+
+            # Apply weighted quality scoring (User requested 10% weight for pose)
+            # Old: Hard caps based on pose -> Harsh penalty
+            # New: Weighted average -> Soft penalty for bad form
+            
+            # Map pose_confidence (0-1) to 0-10 scale
+            pose_rating = pose_confidence * 10
+            
+            # Weighted average: 90% Model Quality, 10% Pose Quality
+            weighted_quality = (numeric_quality * 0.9) + (pose_rating * 0.1)
+            numeric_quality = int(round(weighted_quality))
+            
+            # Add note if form score is low but we're not harshly penalizing
+            # User requested to remove detailed flags for cleaner UI
+            # if pose_confidence < 0.3:
+            #      if "(Form Adjusted)" not in quality_label:
+            #         quality_label = f"{quality_label} (Form Adjusted)"
+
+            # Keep Model Confidence Penalty (Prediction Certainty)
+            # If the model itself is unsure, we still cap the score
+            if confidence < 0.3:
+                numeric_quality = min(numeric_quality, 4)
+                # if "(Low Confidence)" not in quality_label:
+                #     quality_label = f"{quality_label} (Low Confidence)"
+            elif confidence < 0.5:
+                numeric_quality = min(numeric_quality, 7)
+
+            # 2. Model Confidence Penalty (Prediction Certainty)
+            if confidence < 0.3:
+                numeric_quality = min(numeric_quality, 4)
+                if "(Poor Form/Detection)" not in quality_label:
+                    quality_label = f"{quality_label} (Low Confidence)"
+            elif confidence < 0.5:
+                numeric_quality = min(numeric_quality, 7)
         else:
-            action_label, confidence, quality_label, numeric_quality = "Other", 0.0, "Developing", 1
+            action_label, confidence, quality_label, numeric_quality = "Other", 0.0, "Developing", 3
             metrics = {k: {"label": "Unknown", "confidence": 0.0} for k in ["subtype", "technique", "placement", "position", "intent"]}
             metrics["quality"] = "Developing"
 
@@ -313,7 +466,7 @@ async def analyze_video(file: UploadFile = File(...)):
                     f"- Placement: {reco_place}\n"
                     f"- Court Position: {reco_pos}\n"
                     f"- Tactical Intent: {reco_intent}\n"
-                    f"- Quality: {numeric_quality}/7 ({quality_label})"
+                    f"- Quality: {numeric_quality}/10 ({quality_label})"
                 )
                 prompt = (
                     f"You are a professional badminton coach. Analyze this stroke data and provide 3 concise technical tips:\n"
