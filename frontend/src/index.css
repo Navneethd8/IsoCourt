@@ -1914,6 +1914,14 @@ img.pixel-pose__canvas {
   box-shadow: 0 16px 48px var(--shadow-md);
 }
 
+/* Closed dialogs must stay hidden. A display utility (flex/grid/block) beats the
+   UA `dialog:not([open]) { display: none }` rule and leaves the frame lightbox
+   scrim painted over Analyze. Header z-index sits above that scrim, which is
+   why only the page body looks stuck. */
+dialog:not([open]) {
+  display: none;
+}
+
 .app-lightbox-close {
   border-radius: 999px;
   background-color: var(--surface);
