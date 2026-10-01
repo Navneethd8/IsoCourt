@@ -144,10 +144,17 @@ jobs:
             --exclude='core/split.py' \
             backend/ hf_space/
 
+      # backend/data is gitignored, so Actions checkouts usually lack this list.
+      # Startup already falls back to built-in class names when the file is absent.
       - name: Copy dataset metadata JSON only (no bulk data/)
         run: |
-          mkdir -p hf_space/data
-          cp backend/data/transformed_combined_rounds_output_en_evals_translated.json hf_space/data/
+          src=backend/data/transformed_combined_rounds_output_en_evals_translated.json
+          if [[ -f "$src" ]]; then
+            mkdir -p hf_space/data
+            cp "$src" hf_space/data/
+          else
+            echo "Dataset list not in the checkout. Space will use the class-name fallback."
+          fi
 
       - name: Copy only the inference checkpoint (registry + inference_selection)
         run: |
