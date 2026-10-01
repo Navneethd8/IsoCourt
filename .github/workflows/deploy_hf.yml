@@ -87,10 +87,16 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.HF_SSH_KEY }}
 
+      # hf.co waits for the client banner, so ssh-keyscan exits 1 and aborts the job.
+      # Keys are the published fingerprints from https://huggingface.co/docs/hub/security-git-ssh
       - name: Add hf.co to known_hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan hf.co >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/known_hosts <<'EOF'
+          hf.co ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINJjhgtT9FOQrsVSarIoPVI1jFMh3VSHdKfdqp/O776s
+          hf.co ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBL0wtM52yIjm8gRecBy2wRyEMqr8ulG0uewT/IQOGz5K0ZPTIy6GIGHsTi8UXBiEzEIznV3asIz2sS7SiQ311tU=
+          hf.co ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDtPB+snz63eZvTrbMY2Qt39a6HYile89JOum55z3lhIqAqUHxLtXFd+q+ED8izQvyORFPSmFIaPw05rtXo37bm+ixL6wDmvWrHN74oUUWmtrv2MNCLHE5VDb3+Q6MJjjDVIoK5QZIuTStlq0cUbGGxQk7vFZZ2VXdTPqgPjw4hMV7MGp3RFY/+Wy8rIMRv+kRCIwSAOeuaLPT7FzL0zUMDwj/VRjlzC08+srTQHqfoh0RguZiXZQneZKmM75AFhoMbP5x4AW2bVoZam864DSGiEwL8R2jMiyXxL3OuicZteZqll0qfRlNopKnzoxS29eBbXTr++ILqYz1QFqaruUgqSi3MIC9sDYEqh2Q8UxP5+Hh97AnlgWDZC0IhojVmEPNAc7Y2d+ctQl4Bt91Ik4hVf9bU+tqMXgaTrTMXeTURSXRxJEm2zfKQVkqn3vS/zGVnkDS+2b2qlVtrgbGdU/we8Fux5uOAn/dq5GygW/DUlHFw412GtKYDFdWjt3nJCY8=
+          EOF
 
       # LFS blob transfers always use HTTPS even when git uses SSH.
       # We configure git credentials so LFS can authenticate for push.
