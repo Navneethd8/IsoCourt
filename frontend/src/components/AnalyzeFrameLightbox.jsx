@@ -26,7 +26,7 @@ export default function AnalyzeFrameLightbox({
     return (
         <dialog
             ref={dialogRef}
-            className="fixed inset-0 z-[100] m-0 flex h-full max-h-none w-full max-w-none items-center justify-center border-none bg-transparent p-4 md:p-8"
+            className="fixed inset-0 z-[100] m-0 h-full max-h-none w-full max-w-none items-center justify-center border-none bg-transparent p-4 md:p-8 [&[open]]:flex"
             onCancel={handleCancel}
             aria-label="Frame analysis"
         >
