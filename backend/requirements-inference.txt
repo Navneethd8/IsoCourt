@@ -12,6 +12,7 @@ python-dotenv
 cachetools
 sse-starlette
 sendgrid
+tqdm
 timm>=0.9.0
 transformers>=4.38.0
 safetensors>=0.4.0

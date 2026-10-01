@@ -139,7 +139,6 @@ jobs:
             --exclude='*.ipynb' \
             --exclude='models/*.pth' \
             --exclude='models/pose_cache_mediapipe.pt' \
-            --exclude='core/training_progress.py' \
             --exclude='core/seed_utils.py' \
             --exclude='core/split.py' \
             backend/ hf_space/
