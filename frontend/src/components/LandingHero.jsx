@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import ReactGA from 'react-ga4'
+import { track } from '../analytics.js'
 import FigmaButton from './FigmaButton'
 import HeroStaticBackdrop from './HeroStaticBackdrop'
 
@@ -59,14 +59,14 @@ export default function LandingHero() {
                     <FigmaButton
                         variant="primary"
                         href="/analyze"
-                        onClick={() => ReactGA.event({ category: 'Navigation', action: 'analyze_click', label: 'landing_hero' })}
+                        onClick={() => track('cta_click', { cta: 'analyze', placement: 'hero' })}
                     >
                         Drop a clip
                     </FigmaButton>
                     <FigmaButton
                         variant="secondary"
                         href="/live"
-                        onClick={() => ReactGA.event({ category: 'Navigation', action: 'live_coaching_click', label: 'landing_hero' })}
+                        onClick={() => track('cta_click', { cta: 'live', placement: 'hero' })}
                     >
                         Go live
                     </FigmaButton>

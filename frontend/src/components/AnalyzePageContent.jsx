@@ -1,4 +1,4 @@
-import ReactGA from 'react-ga4'
+import { track } from '../analytics.js'
 import AppShell from './AppShell'
 import { Icon } from './AnalyzeIcon'
 import AnalyzeFrameLightbox from './AnalyzeFrameLightbox'
@@ -166,7 +166,7 @@ export default function AnalyzePageContent({ controller }) {
                 <div className="mt-4 text-center">
                     <a
                         href="/#feedback"
-                        onClick={() => ReactGA.event({ category: 'Feedback', action: 'feedback_link_clicked', label: 'analyze_page' })}
+                        onClick={() => track('feedback_link_clicked', { placement: 'analyze_page' })}
                         className="inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-brand transition-colors"
                     >
                         <Icon name="chat" size={14} />

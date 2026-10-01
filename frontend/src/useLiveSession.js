@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useReducer } from 'react'
-import ReactGA from 'react-ga4'
+import { track } from './analytics.js'
 
 const FRAME_INTERVAL_MS = 200
 
@@ -84,6 +84,42 @@ export function useLiveSession() {
     const busyRef = useRef(false)
     const mountedRef = useRef(true)
     const onBreakRef = useRef(null)
+    const liveTrackRef = useRef({
+        generation: 0,
+        attempted: false,
+        started: false,
+        coached: false,
+        failed: false,
+    })
+
+    const failLive = useCallback((reason, stage, statusCode) => {
+        const current = liveTrackRef.current
+        if (current.failed) return
+        current.failed = true
+        const params = { reason, stage }
+        if (Number.isInteger(statusCode)) params.status_code = statusCode
+        track('live_session_failed', params, { beacon: true })
+    }, [])
+
+    const noteLiveEnded = useCallback(() => {
+        const current = liveTrackRef.current
+        if (!current.attempted || current.failed || current.coached) return
+        failLive('no_result', current.started ? 'session' : 'create')
+    }, [failLive])
+
+    const noteCoaching = useCallback(() => {
+        const current = liveTrackRef.current
+        if (current.coached) return
+        current.coached = true
+        track('live_coaching_delivered')
+    }, [])
+
+    const noteStarted = useCallback(() => {
+        const current = liveTrackRef.current
+        if (current.started) return
+        current.started = true
+        track('live_session_started')
+    }, [])
 
     const [sessionUi, dispatch] = useReducer(sessionUiReducer, initialSessionUi)
     const { status, statusMsg, errorMsg, lastResult, onBreak, cameraError } = sessionUi
@@ -227,6 +263,7 @@ export function useLiveSession() {
     const endSession = useCallback(async () => {
         if (busyRef.current) return
         busyRef.current = true
+        noteLiveEnded()
         try {
             await exitExpanded()
             stopCamera()
@@ -240,7 +277,7 @@ export function useLiveSession() {
         } finally {
             busyRef.current = false
         }
-    }, [apiUrl, stopCamera, exitExpanded])
+    }, [apiUrl, stopCamera, exitExpanded, noteLiveEnded])
 
     const pauseSession = useCallback(() => {
         if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
@@ -257,32 +294,38 @@ export function useLiveSession() {
 
     useEffect(() => {
         mountedRef.current = true
+        const onHide = () => noteLiveEnded()
+        window.addEventListener('pagehide', onHide)
         return () => {
             mountedRef.current = false
+            window.removeEventListener('pagehide', onHide)
+            noteLiveEnded()
             stopCamera()
         }
-    }, [stopCamera])
+    }, [stopCamera, noteLiveEnded])
 
     useEffect(() => {
         if (!sessionId) return undefined
 
+        const generation = liveTrackRef.current.generation
+        const isCurrent = () => liveTrackRef.current.generation === generation
         const ws = new WebSocket(`${wsBase}/live/sessions/${sessionId}/ws`)
         wsRef.current = ws
 
         ws.onopen = () => {
-            if (!mountedRef.current || wsRef.current !== ws) {
+            if (!isCurrent() || !mountedRef.current || wsRef.current !== ws) {
                 ws.close()
                 return
             }
             dispatch({ type: 'SET_LIVE' })
             pushChat('system', 'Session started. Point your camera at the court.')
-            ReactGA.event({ category: 'Live', action: 'Session Started' })
+            noteStarted()
             beginFrameLoop(videoRef.current, canvasRef.current, ws, intervalRef)
             busyRef.current = false
         }
 
         ws.onmessage = (msg) => {
-            if (!mountedRef.current || wsRef.current !== ws) return
+            if (!isCurrent() || !mountedRef.current || wsRef.current !== ws) return
             try {
                 const data = JSON.parse(msg.data)
                 if (data.event === 'status') {
@@ -299,24 +342,33 @@ export function useLiveSession() {
                     dispatch({ type: 'SET_LAST_RESULT', result: data })
                     const conf = data.confidence != null ? `${(data.confidence * 100).toFixed(0)}%` : ''
                     pushChat('analysis', `${data.label} ${conf}`)
+                    noteCoaching()
                 } else if (data.event === 'commentary') {
-                    if (data.text) { pushChat('coach', data.text); speak(data.text) }
+                    if (data.text) {
+                        pushChat('coach', data.text)
+                        speak(data.text)
+                        noteCoaching()
+                    }
                 } else if (data.event === 'error') {
                     dispatch({ type: 'SET_ERROR_MSG', errorMsg: data.error })
                     pushChat('system', `Error: ${data.error}`)
+                    failLive('ws_error', 'session')
                 }
             } catch {}
         }
 
         ws.onerror = () => {
+            if (!isCurrent()) return
             if (mountedRef.current && wsRef.current === ws) {
                 dispatch({ type: 'SET_ERROR', errorMsg: 'WebSocket connection failed.' })
             }
+            failLive('ws_error', 'socket')
             busyRef.current = false
         }
 
         ws.onclose = () => {
             if (intervalRef.current) clearInterval(intervalRef.current)
+            if (isCurrent()) noteLiveEnded()
             busyRef.current = false
         }
 
@@ -325,7 +377,7 @@ export function useLiveSession() {
             ws.close()
             if (wsRef.current === ws) wsRef.current = null
         }
-    }, [sessionId, wsBase, pushChat, speak])
+    }, [sessionId, wsBase, pushChat, speak, noteStarted, noteCoaching, failLive, noteLiveEnded])
 
     const startSession = useCallback(async () => {
         if (busyRef.current) return
@@ -333,7 +385,16 @@ export function useLiveSession() {
         dispatch({ type: 'START_CONNECTING' })
         setChatLog([])
 
-        ReactGA.event({ category: 'Live', action: 'Session Start Attempt' })
+        noteLiveEnded()
+        const generation = liveTrackRef.current.generation + 1
+        liveTrackRef.current = {
+            generation,
+            attempted: true,
+            started: false,
+            coached: false,
+            failed: false,
+        }
+        track('live_start_attempted')
 
         let sid
         try {
@@ -341,21 +402,26 @@ export function useLiveSession() {
             if (res.status === 503) {
                 const body = await res.json().catch(() => ({}))
                 dispatch({ type: 'SET_CAPACITY', errorMsg: body?.detail?.error || 'Live sessions are at capacity. Try again later.' })
-                ReactGA.event({ category: 'Live', action: 'Capacity Reached' })
+                failLive('capacity', 'create', 503)
                 busyRef.current = false
                 return
             }
-            if (!res.ok) throw new Error(`Server error ${res.status}`)
+            if (!res.ok) {
+                failLive('http_error', 'create', res.status)
+                throw new Error(`Server error ${res.status}`)
+            }
             const data = await res.json()
             sid = data.session_id
             if (!mountedRef.current) {
                 try { await fetch(`${apiUrl}/live/sessions/${sid}`, { method: 'DELETE' }) } catch {}
+                failLive('no_result', 'create')
                 busyRef.current = false
                 return
             }
             sessionIdRef.current = sid
         } catch (e) {
             dispatch({ type: 'SET_ERROR', errorMsg: e.message || 'Failed to start session' })
+            failLive('http_error', 'create')
             busyRef.current = false
             return
         }
@@ -371,6 +437,7 @@ export function useLiveSession() {
                 stream.getTracks().forEach(track => track.stop())
                 try { await fetch(`${apiUrl}/live/sessions/${sid}`, { method: 'DELETE' }) } catch {}
                 sessionIdRef.current = null
+                failLive('no_result', 'camera')
                 busyRef.current = false
                 return
             }
@@ -378,12 +445,13 @@ export function useLiveSession() {
             dispatch({ type: 'SET_CAMERA_ERROR', cameraError: 'Camera access denied or unavailable.' })
             try { await fetch(`${apiUrl}/live/sessions/${sid}`, { method: 'DELETE' }) } catch {}
             sessionIdRef.current = null
+            failLive('camera_denied', 'camera')
             busyRef.current = false
             return
         }
 
         setSessionId(sid)
-    }, [apiUrl])
+    }, [apiUrl, failLive, noteLiveEnded])
 
     const dismissCapacity = useCallback(() => {
         dispatch({ type: 'DISMISS_CAPACITY' })

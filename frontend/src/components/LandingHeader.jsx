@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import ReactGA from 'react-ga4'
+import { track } from '../analytics.js'
 import Logo from './Logo'
 import ThemeToggle from './ThemeToggle'
 
@@ -20,14 +20,14 @@ export default function LandingHeader() {
                 <nav className="flex items-center gap-3 sm:gap-5" aria-label="Primary">
                     <Link
                         to="/analyze"
-                        onClick={() => ReactGA.event({ category: 'Navigation', action: 'analyze_click', label: 'landing_nav' })}
+                        onClick={() => track('cta_click', { cta: 'analyze', placement: 'nav' })}
                         className="font-mono text-[11px] uppercase tracking-[0.18em] text-white hover:text-white/90 transition-colors"
                     >
                         Analyze
                     </Link>
                     <Link
                         to="/live"
-                        onClick={() => ReactGA.event({ category: 'Navigation', action: 'live_coaching_click', label: 'landing_nav' })}
+                        onClick={() => track('cta_click', { cta: 'live', placement: 'nav' })}
                         className="font-mono text-[11px] uppercase tracking-[0.18em] text-white hover:text-white/90 transition-colors"
                     >
                         Live

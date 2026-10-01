@@ -1,4 +1,4 @@
-import ReactGA from 'react-ga4'
+import { track } from '../analytics.js'
 import FigmaButton from './FigmaButton'
 
 export default function LandingFinalCta() {
@@ -14,14 +14,14 @@ export default function LandingFinalCta() {
                     <FigmaButton
                         variant="primary"
                         href="/analyze"
-                        onClick={() => ReactGA.event({ category: 'Navigation', action: 'analyze_click', label: 'landing_footer' })}
+                        onClick={() => track('cta_click', { cta: 'analyze', placement: 'footer' })}
                     >
                         Drop a clip
                     </FigmaButton>
                     <FigmaButton
                         variant="secondary"
                         href="/live"
-                        onClick={() => ReactGA.event({ category: 'Navigation', action: 'live_coaching_click', label: 'landing_footer' })}
+                        onClick={() => track('cta_click', { cta: 'live', placement: 'footer' })}
                     >
                         Go live
                     </FigmaButton>

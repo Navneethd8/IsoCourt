@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useReducer } from 'react'
 import { useDropzone } from 'react-dropzone'
 import axios from 'axios'
-import ReactGA from 'react-ga4'
+import { track } from './analytics.js'
 
 export const loadingSteps = [
     { icon: 'movie_filter', label: 'Splitting clip into frames' },
@@ -95,6 +95,7 @@ export function useAnalyzeController() {
     const frameTipCacheRef = useRef({})
     const retryTimerRef = useRef(null)
     const frameTipAbortRef = useRef(null)
+    const attemptRef = useRef(null)
 
     // Mobile detection
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -106,6 +107,29 @@ export function useAnalyzeController() {
 
     // Camera recording state (Laptop)
     const [inputMode, setInputMode] = useState('upload') // 'upload' | 'record'
+
+    const beginAnalyze = (stage) => {
+        attemptRef.current = { stage, settled: false }
+        track('analyze_started', { source: inputMode === 'record' ? 'record' : 'upload' })
+    }
+
+    const settleAnalyze = (outcome, params = {}) => {
+        const attempt = attemptRef.current
+        if (!attempt || attempt.settled) return
+        attempt.settled = true
+        track(outcome, { stage: attempt.stage, ...params }, { beacon: outcome === 'analyze_failed' })
+    }
+
+    useEffect(() => {
+        const onHide = () => {
+            const attempt = attemptRef.current
+            if (!attempt || attempt.settled) return
+            attempt.settled = true
+            track('analyze_failed', { stage: attempt.stage, reason: 'no_result' }, { beacon: true })
+        }
+        window.addEventListener('pagehide', onHide)
+        return () => window.removeEventListener('pagehide', onHide)
+    }, [])
     const [isRecording, setIsRecording] = useState(false)
     const [cameraError, setCameraError] = useState(null)
     const [recordingSeconds, setRecordingSeconds] = useState(0)
@@ -225,7 +249,6 @@ export function useAnalyzeController() {
             const recorded = new File([blob], `recording.${ext}`, { type: mimeType })
             setFile(recorded)
             closeCamera()
-            ReactGA.event({ category: 'Video', action: 'Camera Recording Captured', label: `${recordingSeconds}s` })
         }
         mediaRecorderRef.current = recorder
         recorder.start(250) // collect chunks every 250 ms
@@ -351,6 +374,7 @@ export function useAnalyzeController() {
         setLoading(true)
         setCapacityError(null)
         startLoadingSteps()
+        beginAnalyze('submit')
         const formData = new FormData()
         formData.append('file', file)
 
@@ -368,19 +392,10 @@ export function useAnalyzeController() {
                     over_duration_limit: isOverDuration,
                     validation_details: response.data.validation_details
                 })
-                if (isOverDuration) {
-                    ReactGA.event({ category: "Video", action: "Clip Too Long", label: file?.name })
-                } else {
-                    ReactGA.event({ category: "Video", action: "Validation Failed", label: response.data.error })
-                }
+                settleAnalyze('analyze_failed', { reason: isOverDuration ? 'too_long' : 'validation' })
             } else {
                 setResult(response.data)
-                ReactGA.event({
-                    category: "Video",
-                    action: "Clip Analyzed",
-                    label: response.data.quality_label,
-                    value: response.data.quality_numeric
-                });
+                settleAnalyze('analyze_completed')
             }
         } catch (error) {
             console.error("Error uploading file:", error)
@@ -391,7 +406,7 @@ export function useAnalyzeController() {
                 setCapacityError(retryAfter)
                 if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
                 retryTimerRef.current = setTimeout(() => setCapacityError(null), retryAfter * 1000)
-                ReactGA.event({ category: "Video", action: "Server At Capacity", label: file?.name })
+                settleAnalyze('analyze_failed', { reason: 'capacity', status_code: 503 })
             } else if (error.response?.data?.validation_failed) {
                 const isOverDuration = error.response.data.over_duration_limit || false
                 setResult({
@@ -400,17 +415,20 @@ export function useAnalyzeController() {
                     over_duration_limit: isOverDuration,
                     validation_details: error.response.data.validation_details
                 })
-                if (isOverDuration) {
-                    ReactGA.event({ category: "Video", action: "Clip Too Long", label: file?.name })
-                } else {
-                    ReactGA.event({ category: "Video", action: "Validation Failed", label: error.response.data.error })
-                }
+                settleAnalyze('analyze_failed', { reason: isOverDuration ? 'too_long' : 'validation' })
             } else {
                 const errorMessage = error.response?.data?.detail || error.message || "Error analyzing video"
-                ReactGA.event({ category: "Video", action: "Analysis Failed", label: errorMessage })
+                const statusCode = error.response?.status
+                settleAnalyze('analyze_failed', {
+                    reason: 'http_error',
+                    ...(Number.isInteger(statusCode) ? { status_code: statusCode } : {}),
+                })
                 alert(`Analysis failed: ${errorMessage}`)
             }
         } finally {
+            if (attemptRef.current && !attemptRef.current.settled) {
+                settleAnalyze('analyze_failed', { reason: 'no_result' })
+            }
             setLoading(false)
             stopLoadingSteps()
         }
@@ -428,10 +446,7 @@ export function useAnalyzeController() {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
         const formData = new FormData()
         formData.append('file', file)
-
-        ReactGA.event({ category: 'Video', action: 'Stream Started', label: file.name })
-
-        let windowCount = 0
+        beginAnalyze('stream')
 
         const readSseStream = async (response) => {
             const reader = response.body.getReader()
@@ -461,38 +476,23 @@ export function useAnalyzeController() {
                         const ahead = typeof parsed.ahead === 'number' ? parsed.ahead : null
                         setQueueAhead(ahead)
                     } else if (parsed.event === 'progress') {
-                        windowCount++
                         pushStreamedEvent(parsed)
-                        if (windowCount % 5 === 1) {
-                            ReactGA.event({
-                                category: 'Video',
-                                action: 'Stream Window Received',
-                                label: parsed.label,
-                                value: windowCount,
-                            })
-                        }
                     } else if (parsed.event === 'done') {
                         setQueueAhead(null)
                         const summary = parsed.summary || {}
                         const timeline = resolveTimeline(summary, streamedTimeline)
                         setResult({ ...summary, timeline })
                         setStreamingTimeline([])
-                        ReactGA.event({
-                            category: 'Video',
-                            action: 'Stream Complete',
-                            label: summary.action || 'Unknown',
-                            value: windowCount,
-                        })
+                        settleAnalyze('analyze_completed')
                     } else if (parsed.event === 'error') {
                         setQueueAhead(null)
                         const isOverDuration = parsed.over_duration_limit || false
-                        if (isOverDuration) {
-                            setResult({ validation_error: true, error_message: parsed.error, over_duration_limit: true })
-                            ReactGA.event({ category: 'Video', action: 'Clip Too Long', label: file.name })
-                        } else {
-                            ReactGA.event({ category: 'Video', action: 'Stream Error', label: parsed.error })
-                            setResult({ validation_error: true, error_message: parsed.error, over_duration_limit: false })
-                        }
+                        setResult({
+                            validation_error: true,
+                            error_message: parsed.error,
+                            over_duration_limit: isOverDuration,
+                        })
+                        settleAnalyze('analyze_failed', { reason: isOverDuration ? 'too_long' : 'stream_dropped' })
                     }
                 }
             }
@@ -511,13 +511,13 @@ export function useAnalyzeController() {
                 setCapacityError(retryAfter)
                 if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
                 retryTimerRef.current = setTimeout(() => setCapacityError(null), retryAfter * 1000)
-                ReactGA.event({ category: 'Video', action: 'Clip Queue Full', label: file.name })
+                settleAnalyze('analyze_failed', { reason: 'capacity', status_code: 503 })
                 return
             }
 
             if (!jobRes.ok) {
                 const errText = await jobRes.text().catch(() => '')
-                ReactGA.event({ category: 'Video', action: 'Job Create Failed', label: String(jobRes.status) })
+                settleAnalyze('analyze_failed', { reason: 'http_error', status_code: jobRes.status })
                 alert(`Could not start analysis (${jobRes.status}): ${errText.slice(0, 120)}`)
                 return
             }
@@ -525,7 +525,7 @@ export function useAnalyzeController() {
             const jobJson = await jobRes.json()
             const jobId = jobJson.job_id
             if (!jobId) {
-                ReactGA.event({ category: 'Video', action: 'Job Create Failed', label: 'no job_id' })
+                settleAnalyze('analyze_failed', { reason: 'no_result' })
                 alert('Invalid response from server (missing job_id).')
                 return
             }
@@ -533,12 +533,14 @@ export function useAnalyzeController() {
             const streamRes = await fetch(`${apiUrl}/clips/jobs/${jobId}/stream`)
             if (streamRes.status === 404) {
                 setQueueAhead(null)
+                settleAnalyze('analyze_failed', { reason: 'stream_dropped', status_code: 404 })
                 alert('Analysis job not found. Please try uploading again.')
                 return
             }
             if (!streamRes.ok) {
                 setQueueAhead(null)
                 const t = await streamRes.text().catch(() => '')
+                settleAnalyze('analyze_failed', { reason: 'http_error', status_code: streamRes.status })
                 alert(`Stream failed (${streamRes.status}): ${t.slice(0, 120)}`)
                 return
             }
@@ -547,8 +549,11 @@ export function useAnalyzeController() {
         } catch (err) {
             console.error('Stream error:', err)
             setQueueAhead(null)
-            ReactGA.event({ category: 'Video', action: 'Analysis Failed', label: err.message })
+            settleAnalyze('analyze_failed', { reason: 'stream_dropped' })
         } finally {
+            if (attemptRef.current && !attemptRef.current.settled) {
+                settleAnalyze('analyze_failed', { reason: 'no_result' })
+            }
             setLoading(false)
             stopLoadingSteps()
             setQueueAhead(null)

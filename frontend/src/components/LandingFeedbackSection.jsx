@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import ReactGA from 'react-ga4'
+import { track } from '../analytics.js'
 import FigmaButton from './FigmaButton'
 import SvgIcon from './SvgIcon'
 
@@ -31,7 +31,7 @@ export default function LandingFeedbackSection() {
             setFbName('')
             setFbEmail('')
             setFbMessage('')
-            ReactGA.event({ category: 'Feedback', action: 'feedback_sent', label: 'landing_page' })
+            track('feedback_sent', { placement: 'landing_page' })
         } catch (err) {
             setFbStatus('error')
             setFbError(err?.response?.data?.detail || 'Something went wrong. Please try again.')

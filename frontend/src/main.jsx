@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
-import ReactGA from 'react-ga4'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { installDeferredBoot, trackPageView } from './analytics.js'
 import './fonts.css'
 import './index.css'
 import { ThemeProvider } from './context/ThemeContext.jsx'
@@ -19,20 +19,14 @@ const ComparePage = lazy(() => import('./components/ComparePage.jsx'))
 const WhatIsStrokeAnalysisPage = lazy(() => import('./components/WhatIsStrokeAnalysisPage.jsx'))
 const NotFoundPage = lazy(() => import('./components/NotFoundPage.jsx'))
 
-// Load GA only after first real interaction (keeps Lighthouse / LCP clean)
-if (typeof window !== 'undefined') {
-    let booted = false
-    const bootAnalytics = () => {
-        if (booted) return
-        booted = true
-        ReactGA.initialize('G-TET6JN36Q4')
-        ;['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach((type) => {
-            window.removeEventListener(type, bootAnalytics)
-        })
-    }
-    ;['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach((type) => {
-        window.addEventListener(type, bootAnalytics, { once: true, passive: true })
-    })
+installDeferredBoot()
+
+function RouteAnalytics() {
+    const { pathname } = useLocation()
+    useEffect(() => {
+        trackPageView(pathname)
+    }, [pathname])
+    return null
 }
 
 function RouteFallback() {
@@ -57,6 +51,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
         <ThemeProvider>
             <BrowserRouter>
+                <RouteAnalytics />
                 <JsonLd />
                 <ClearSeoStatic />
                 <Suspense fallback={<RouteFallback />}>
