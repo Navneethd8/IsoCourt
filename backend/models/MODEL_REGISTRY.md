@@ -184,3 +184,11 @@ VLMs (Qwen, JSONL, etc.) live under `backend/pipelines/vlm/` and are **not** ent
 GitHub Actions **does not rsync every** `models/*.pth` into the Space (that would waste runner time and LFS). It **excludes all** `.pth` during `rsync`, then **copies only** the checkpoint resolved by `inference_selection.json` / `ISOCOURT_INFERENCE_CATEGORY` (same rules as local inference). A follow-up step still **slims** `model_registry.json` to that category’s `primary` only.
 
 Set `backend/models/inference_selection.json` on `main` to the architecture you want shipped before each deploy (or set `ISOCOURT_INFERENCE_CATEGORY` on the workflow if you add that env to the job).
+
+## Paper checkpoint (Hugging Face model)
+
+The main JVC weight is the `k_st_vit` primary (`badminton_model_k_st_vit.pth`, 80.61% val `stroke_type`). It is published as a model repo, separate from the BadCoach Space, so people can download and run it:
+
+`https://huggingface.co/navneethdg/isocourt-jvc`
+
+Card and config live in `hf/isocourt-jvc/`. Regenerate them from the checkpoint with `python scripts/publish_jvc_to_hf.py --write-card`. Upload with `HF_TOKEN` set, or run the **Publish JVC model to Hugging Face** workflow (uses the `HF_TOKEN` / `HF_USERNAME` secrets). Load path: `core.hf_jvc_release.load_published_jvc`.
