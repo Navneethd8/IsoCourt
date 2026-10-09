@@ -7,7 +7,6 @@ K-STViT run (registry category ``k_st_vit``), not the no-cross-attention ablatio
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 from typing import Any, Dict, Mapping
 
@@ -17,7 +16,6 @@ DEFAULT_HF_REPO_NAME = "JVC"
 # Previous id, moved on the next publish.
 PREVIOUS_HF_REPO_NAME = "isocourt-jvc"
 DEMO_URL = "https://isocourt.fit"
-CODE_URL = "https://github.com/Navneethd8/IsoCourt"
 DATASET_ID = "Moujuruo/Finebadminton-20K"
 # Training artifact in this repo. The Hub file is published under a separate name.
 LOCAL_CHECKPOINT_FILENAME = "badminton_model_k_st_vit.pth"
@@ -188,7 +186,6 @@ def build_config(meta: Mapping[str, Any], repo_id: str) -> Dict[str, Any]:
         },
         "dataset": DATASET_ID,
         "demo": DEMO_URL,
-        "code": CODE_URL,
         "paper": {
             "title": PAPER_TITLE,
             "url": PAPER_URL,
@@ -205,7 +202,6 @@ def render_model_card(config: Mapping[str, Any]) -> str:
     epoch = config["metrics"]["epoch"]
     repo_id = config["repo_id"]
     labels = ", ".join(f"`{name}`" for name in config["labels"]["stroke_type"])
-    stroke_literal = json.dumps(list(config["labels"]["stroke_type"]))
     return f"""---
 tags:
   - pytorch
@@ -248,7 +244,6 @@ A 16-frame hit clip goes through two encoders: R(2+1)D Conv3D for RGB patches, a
 | Skeleton | MediaPipe BlazePose, 33 joints × (x, y, z), four-stream (joint, bone, joint-motion, bone-motion) |
 | Paper | [{PAPER_TITLE}]({PAPER_URL}) |
 | Demo | [isocourt.fit]({DEMO_URL}) |
-| Code | [{CODE_URL}]({CODE_URL}) |
 
 Stroke classes, in logit order: {labels}.
 
@@ -258,35 +253,12 @@ The checkpoint also emits logits for `technique`, `placement`, `position`, `inte
 
 Upload a clip at [isocourt.fit]({DEMO_URL}).
 
-## Load the checkpoint
-
-```bash
-git clone {CODE_URL}
-cd IsoCourt
-pip install -r backend/requirements.txt
-pip install torch torchvision huggingface_hub
-```
+## Weights
 
 ```python
-import sys
-sys.path.insert(0, "backend")
-
-import torch
 from huggingface_hub import hf_hub_download
-from core.hf_jvc_release import load_published_jvc
-
-STROKE_TYPE = {stroke_literal}
 
 path = hf_hub_download("{repo_id}", "{HUB_CHECKPOINT_FILENAME}")
-model = load_published_jvc(path)  # eval mode; Conv3D weights come from the checkpoint
-
-frames = torch.zeros(1, 16, 3, 224, 224)  # RGB, ImageNet-normalized
-pose = torch.zeros(1, 16, 33, 3)          # MediaPipe x, y, z
-with torch.no_grad():
-    logits = model(frames, pose)
-
-stroke_id = int(logits["stroke_type"].argmax(dim=-1))
-print(STROKE_TYPE[stroke_id])
 ```
 
 `frames` is `(batch, 16, 3, 224, 224)` float RGB after ImageNet normalization

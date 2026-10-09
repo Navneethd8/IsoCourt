@@ -40,7 +40,6 @@ A 16-frame hit clip goes through two encoders: R(2+1)D Conv3D for RGB patches, a
 | Skeleton | MediaPipe BlazePose, 33 joints × (x, y, z), four-stream (joint, bone, joint-motion, bone-motion) |
 | Paper | [JVC: Joint Vision Cross-Attention for Fine-Grained Badminton Stroke Recognition](https://openreview.net/forum?id=XJEhcXfwEe) |
 | Demo | [isocourt.fit](https://isocourt.fit) |
-| Code | [https://github.com/Navneethd8/IsoCourt](https://github.com/Navneethd8/IsoCourt) |
 
 Stroke classes, in logit order: `Serve`, `Clear`, `Smash`, `Drop`, `Drive`, `Net_Shot`, `Lob`, `Defensive_Shot`, `Other`.
 
@@ -50,35 +49,12 @@ The checkpoint also emits logits for `technique`, `placement`, `position`, `inte
 
 Upload a clip at [isocourt.fit](https://isocourt.fit).
 
-## Load the checkpoint
-
-```bash
-git clone https://github.com/Navneethd8/IsoCourt
-cd IsoCourt
-pip install -r backend/requirements.txt
-pip install torch torchvision huggingface_hub
-```
+## Weights
 
 ```python
-import sys
-sys.path.insert(0, "backend")
-
-import torch
 from huggingface_hub import hf_hub_download
-from core.hf_jvc_release import load_published_jvc
-
-STROKE_TYPE = ["Serve", "Clear", "Smash", "Drop", "Drive", "Net_Shot", "Lob", "Defensive_Shot", "Other"]
 
 path = hf_hub_download("navneethdg/JVC", "jvc.pth")
-model = load_published_jvc(path)  # eval mode; Conv3D weights come from the checkpoint
-
-frames = torch.zeros(1, 16, 3, 224, 224)  # RGB, ImageNet-normalized
-pose = torch.zeros(1, 16, 33, 3)          # MediaPipe x, y, z
-with torch.no_grad():
-    logits = model(frames, pose)
-
-stroke_id = int(logits["stroke_type"].argmax(dim=-1))
-print(STROKE_TYPE[stroke_id])
 ```
 
 `frames` is `(batch, 16, 3, 224, 224)` float RGB after ImageNet normalization
