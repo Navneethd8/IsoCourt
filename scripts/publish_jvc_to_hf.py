@@ -76,7 +76,7 @@ def upload_folder(folder: str, repo_id: str, token: str) -> str:
         folder_path=folder,
         repo_id=repo_id,
         repo_type="model",
-        commit_message="Rename the model to JVC and add the paper citation",
+        commit_message="Update the JVC model card",
     )
     return f"https://huggingface.co/{repo_id}"
 

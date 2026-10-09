@@ -187,7 +187,7 @@ Set `backend/models/inference_selection.json` on `main` to the architecture you 
 
 ## Paper checkpoint (Hugging Face model)
 
-The main JVC weight is the `k_st_vit` primary (`badminton_model_k_st_vit.pth`, 80.61% val `stroke_type`). It is published as a model repo, separate from the BadCoach Space, so people can download and run it:
+The main JVC weight is the `k_st_vit` primary (`badminton_model_k_st_vit.pth`, 80.61% val `stroke_type`). It is published as a model repo so people can download and run it. The demo link on the card is [isocourt.fit](https://isocourt.fit).
 
 `https://huggingface.co/navneethdg/JVC`
 

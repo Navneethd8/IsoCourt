@@ -60,6 +60,9 @@ def test_config_and_card_describe_the_paper_checkpoint():
     assert CHECKPOINT_FILENAME in card
     assert "80.61%" in card
     assert "k_st_vit" in card
+    assert "https://isocourt.fit" in card
+    assert "BadCoach" not in card
+    assert "badcoach" not in card.lower()
 
 
 def test_committed_card_matches_checkpoint_when_weights_are_present():

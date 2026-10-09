@@ -39,7 +39,7 @@ A 16-frame hit clip goes through two encoders: R(2+1)D Conv3D for RGB patches, a
 | Frames | 16, `span_linspace` over the hit span, 224×224, ImageNet normalization |
 | Skeleton | MediaPipe BlazePose, 33 joints × (x, y, z), four-stream (joint, bone, joint-motion, bone-motion) |
 | Paper | [JVC: Joint Vision Cross-Attention for Fine-Grained Badminton Stroke Recognition](https://openreview.net/forum?id=XJEhcXfwEe) |
-| Demo | [https://huggingface.co/spaces/navneethdg/BadCoach](https://huggingface.co/spaces/navneethdg/BadCoach) |
+| Demo | [isocourt.fit](https://isocourt.fit) |
 | Code | [https://github.com/Navneethd8/IsoCourt](https://github.com/Navneethd8/IsoCourt) |
 
 Stroke classes, in logit order: `Serve`, `Clear`, `Smash`, `Drop`, `Drive`, `Net_Shot`, `Lob`, `Defensive_Shot`, `Other`.
@@ -48,7 +48,7 @@ The checkpoint also emits logits for `technique`, `placement`, `position`, `inte
 
 ## Try the demo
 
-The [BadCoach Space](https://huggingface.co/spaces/navneethdg/BadCoach) serves this same weight for video upload and live analysis.
+Upload a clip at [isocourt.fit](https://isocourt.fit).
 
 ## Load the checkpoint
 

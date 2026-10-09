@@ -121,7 +121,7 @@
     "split": "video_level_80_20_seed_42"
   },
   "dataset": "Moujuruo/Finebadminton-20K",
-  "demo_space": "https://huggingface.co/spaces/navneethdg/BadCoach",
+  "demo": "https://isocourt.fit",
   "code": "https://github.com/Navneethd8/IsoCourt",
   "paper": {
     "title": "JVC: Joint Vision Cross-Attention for Fine-Grained Badminton Stroke Recognition",

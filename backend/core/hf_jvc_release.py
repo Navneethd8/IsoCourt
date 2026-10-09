@@ -16,7 +16,7 @@ DEFAULT_HF_USER = "navneethdg"
 DEFAULT_HF_REPO_NAME = "JVC"
 # Previous id, moved on the next publish.
 PREVIOUS_HF_REPO_NAME = "isocourt-jvc"
-DEMO_SPACE_URL = "https://huggingface.co/spaces/navneethdg/BadCoach"
+DEMO_URL = "https://isocourt.fit"
 CODE_URL = "https://github.com/Navneethd8/IsoCourt"
 DATASET_ID = "Moujuruo/Finebadminton-20K"
 CHECKPOINT_FILENAME = "badminton_model_k_st_vit.pth"
@@ -186,7 +186,7 @@ def build_config(meta: Mapping[str, Any], repo_id: str) -> Dict[str, Any]:
             "split": "video_level_80_20_seed_42",
         },
         "dataset": DATASET_ID,
-        "demo_space": DEMO_SPACE_URL,
+        "demo": DEMO_URL,
         "code": CODE_URL,
         "paper": {
             "title": PAPER_TITLE,
@@ -246,7 +246,7 @@ A 16-frame hit clip goes through two encoders: R(2+1)D Conv3D for RGB patches, a
 | Frames | 16, `span_linspace` over the hit span, 224×224, ImageNet normalization |
 | Skeleton | MediaPipe BlazePose, 33 joints × (x, y, z), four-stream (joint, bone, joint-motion, bone-motion) |
 | Paper | [{PAPER_TITLE}]({PAPER_URL}) |
-| Demo | [{DEMO_SPACE_URL}]({DEMO_SPACE_URL}) |
+| Demo | [isocourt.fit]({DEMO_URL}) |
 | Code | [{CODE_URL}]({CODE_URL}) |
 
 Stroke classes, in logit order: {labels}.
@@ -255,7 +255,7 @@ The checkpoint also emits logits for `technique`, `placement`, `position`, `inte
 
 ## Try the demo
 
-The [BadCoach Space]({DEMO_SPACE_URL}) serves this same weight for video upload and live analysis.
+Upload a clip at [isocourt.fit]({DEMO_URL}).
 
 ## Load the checkpoint
 
