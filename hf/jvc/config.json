@@ -1,0 +1,132 @@
+{
+  "architecture": "jvc",
+  "paper_name": "JVC",
+  "repo_id": "navneethdg/JVC",
+  "checkpoint": "jvc.pth",
+  "embed_dim": 128,
+  "st_depth": 4,
+  "num_cross_layers": 2,
+  "num_heads": 4,
+  "skel_embed_dim": 64,
+  "skel_num_heads": 16,
+  "four_stream": true,
+  "vision_backbone": "conv3d",
+  "video_backbone": "r2plus1d_18",
+  "spatial_size": 224,
+  "num_frames": 16,
+  "num_joints": 33,
+  "sampling_mode": "span_linspace",
+  "use_shuttle": false,
+  "contact_pool": true,
+  "task_classes": {
+    "stroke_type": 9,
+    "technique": 3,
+    "placement": 10,
+    "position": 10,
+    "intent": 10,
+    "quality": 7
+  },
+  "labels": {
+    "stroke_type": [
+      "Serve",
+      "Clear",
+      "Smash",
+      "Drop",
+      "Drive",
+      "Net_Shot",
+      "Lob",
+      "Defensive_Shot",
+      "Other"
+    ],
+    "technique": [
+      "Forehand",
+      "Backhand",
+      "Unknown"
+    ],
+    "placement": [
+      "Straight",
+      "Cross-court",
+      "Body_Hit",
+      "Over_Head",
+      "Passing_Shot",
+      "Wide",
+      "Net_Fault",
+      "Out",
+      "Repeat",
+      "Unknown"
+    ],
+    "position": [
+      "Mid_Front",
+      "Mid_Court",
+      "Mid_Back",
+      "Left_Front",
+      "Left_Mid",
+      "Left_Back",
+      "Right_Front",
+      "Right_Mid",
+      "Right_Back",
+      "Unknown"
+    ],
+    "intent": [
+      "Intercept",
+      "Passive",
+      "Defensive",
+      "To_Create_Depth",
+      "Move_To_Net",
+      "Early_Net_Shot",
+      "Deception",
+      "Hesitation",
+      "Seamlessly",
+      "None"
+    ],
+    "quality": [
+      "Developing",
+      "Emerging",
+      "Competent",
+      "Proficient",
+      "Advanced",
+      "Expert",
+      "Elite"
+    ]
+  },
+  "id2label": {
+    "0": "Serve",
+    "1": "Clear",
+    "2": "Smash",
+    "3": "Drop",
+    "4": "Drive",
+    "5": "Net_Shot",
+    "6": "Lob",
+    "7": "Defensive_Shot",
+    "8": "Other"
+  },
+  "label2id": {
+    "Serve": 0,
+    "Clear": 1,
+    "Smash": 2,
+    "Drop": 3,
+    "Drive": 4,
+    "Net_Shot": 5,
+    "Lob": 6,
+    "Defensive_Shot": 7,
+    "Other": 8
+  },
+  "metrics": {
+    "stroke_type_val_acc": 80.61,
+    "epoch": 18,
+    "split": "video_level_80_20_seed_42"
+  },
+  "dataset": "Moujuruo/Finebadminton-20K",
+  "demo": "https://isocourt.fit",
+  "paper": {
+    "title": "JVC: Joint Vision Cross-Attention for Fine-Grained Badminton Stroke Recognition",
+    "url": "https://openreview.net/forum?id=XJEhcXfwEe",
+    "pdf": "https://openreview.net/pdf?id=XJEhcXfwEe",
+    "authors": [
+      "Navneeth Dhamotharan",
+      "Bin Han"
+    ],
+    "year": 2026,
+    "venue": "ECCV 2026 Workshop: Human Motion-Informed World Models and Socially Intelligent Action"
+  }
+}
