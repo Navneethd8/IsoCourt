@@ -35,7 +35,6 @@ def _sample_meta() -> dict:
         "spatial_size": 224,
         "sampling_mode": "span_linspace",
         "use_shuttle": False,
-        "checkpoint_sha256": "abc",
         "num_heads": 4,
         "four_stream": True,
     }
@@ -47,6 +46,7 @@ def test_stroke_labels_match_shared_map():
 
 def test_config_and_card_describe_the_paper_checkpoint():
     config = build_config(_sample_meta(), "navneethdg/JVC")
+    assert "checkpoint_sha256" not in config
     assert config["architecture"] == "jvc"
     assert config["repo_id"] == "navneethdg/JVC"
     assert config["paper"]["url"] == "https://openreview.net/forum?id=XJEhcXfwEe"
@@ -67,6 +67,8 @@ def test_config_and_card_describe_the_paper_checkpoint():
     assert "github.com" not in card
     assert "IsoCourt" not in card
     assert "blazepose" not in card.lower()
+    assert "sha256" not in card.lower()
+    assert "sha-256" not in card.lower()
 
 
 def test_committed_card_matches_checkpoint_when_weights_are_present():

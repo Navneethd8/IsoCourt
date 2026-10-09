@@ -36,7 +36,7 @@ from core.hf_jvc_release import (  # noqa: E402
 CARD_DIR = os.path.join(REPO_ROOT, "hf", "jvc")
 
 
-def write_card_files(dest: str, *, include_checkpoint: bool) -> str:
+def write_card_files(dest: str, *, include_checkpoint: bool) -> None:
     src = checkpoint_path(REPO_ROOT)
     if is_lfs_pointer(src):
         raise SystemExit(
@@ -53,7 +53,6 @@ def write_card_files(dest: str, *, include_checkpoint: bool) -> str:
         f.write(render_model_card(config))
     if include_checkpoint:
         shutil.copy2(src, os.path.join(dest, HUB_CHECKPOINT_FILENAME))
-    return config["checkpoint_sha256"]
 
 
 def _rename_previous_repo(api, repo_id: str) -> None:
@@ -110,8 +109,8 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.write_card:
-        digest = write_card_files(CARD_DIR, include_checkpoint=False)
-        print(f"Wrote {CARD_DIR} (checkpoint sha256 {digest})")
+        write_card_files(CARD_DIR, include_checkpoint=False)
+        print(f"Wrote {CARD_DIR}")
         if not args.dry_run and not os.environ.get("HF_TOKEN"):
             return
 
@@ -122,17 +121,17 @@ def main() -> None:
             raise SystemExit("Set HF_TOKEN to upload, or pass --write-card / --dry-run.")
         if args.dry_run:
             stage = tempfile.mkdtemp(prefix="jvc-")
-            digest = write_card_files(stage, include_checkpoint=True)
-            print(f"Staged {repo_id} at {stage} (sha256 {digest})")
+            write_card_files(stage, include_checkpoint=True)
+            print(f"Staged {repo_id} at {stage}")
         return
 
     stage = tempfile.mkdtemp(prefix="jvc-")
     try:
-        digest = write_card_files(stage, include_checkpoint=True)
+        write_card_files(stage, include_checkpoint=True)
         url = upload_folder(stage, repo_id, token)
     finally:
         shutil.rmtree(stage, ignore_errors=True)
-    print(f"Published {url} (sha256 {digest})")
+    print(f"Published {url}")
 
 
 if __name__ == "__main__":

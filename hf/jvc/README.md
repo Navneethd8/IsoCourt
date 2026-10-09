@@ -67,9 +67,7 @@ Heads return logits, not probabilities.
 | File | Role |
 | --- | --- |
 | `jvc.pth` | Checkpoint. Constructor metadata sits beside the weights. |
-| `config.json` | Architecture, label names, metric, and SHA-256 of the checkpoint. |
-
-SHA-256 of `jvc.pth`: `5f9d4d062baf3a77dcce835f919ce072d59aad294d624e728d37fe84625cf2d8`
+| `config.json` | Architecture, label names, and metric. |
 
 ## What this weight is
 

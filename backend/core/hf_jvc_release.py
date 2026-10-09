@@ -6,7 +6,6 @@ K-STViT run (registry category ``k_st_vit``), not the no-cross-attention ablatio
 """
 from __future__ import annotations
 
-import hashlib
 import os
 from typing import Any, Dict, Mapping
 
@@ -111,14 +110,6 @@ def checkpoint_path(repo_root: str) -> str:
     return os.path.join(os.path.abspath(repo_root), "backend", "models", LOCAL_CHECKPOINT_FILENAME)
 
 
-def sha256_file(path: str) -> str:
-    digest = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def is_lfs_pointer(path: str) -> bool:
     """True when Git LFS has not smudged the checkpoint into a real zip archive."""
     if not os.path.isfile(path):
@@ -137,7 +128,6 @@ def meta_from_checkpoint(path: str) -> Dict[str, Any]:
     if not isinstance(ckpt, dict) or "k_st_vit" not in ckpt:
         raise ValueError(f"{path} is not a JVC K-STViT checkpoint (missing 'k_st_vit')")
     meta = {k: v for k, v in ckpt.items() if k != "k_st_vit"}
-    meta["checkpoint_sha256"] = sha256_file(path)
     meta["four_stream"] = True
     meta["num_frames"] = 16
     meta["num_joints"] = 33
@@ -159,7 +149,6 @@ def build_config(meta: Mapping[str, Any], repo_id: str) -> Dict[str, Any]:
         "paper_name": "JVC",
         "repo_id": repo_id,
         "checkpoint": HUB_CHECKPOINT_FILENAME,
-        "checkpoint_sha256": meta["checkpoint_sha256"],
         "embed_dim": int(meta["embed_dim"]),
         "st_depth": int(meta["st_depth"]),
         "num_cross_layers": int(meta["num_cross_layers"]),
@@ -271,9 +260,7 @@ Heads return logits, not probabilities.
 | File | Role |
 | --- | --- |
 | `{HUB_CHECKPOINT_FILENAME}` | Checkpoint. Constructor metadata sits beside the weights. |
-| `config.json` | Architecture, label names, metric, and SHA-256 of the checkpoint. |
-
-SHA-256 of `{HUB_CHECKPOINT_FILENAME}`: `{config["checkpoint_sha256"]}`
+| `config.json` | Architecture, label names, and metric. |
 
 ## What this weight is
 

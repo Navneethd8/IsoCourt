@@ -3,7 +3,6 @@
   "paper_name": "JVC",
   "repo_id": "navneethdg/JVC",
   "checkpoint": "jvc.pth",
-  "checkpoint_sha256": "5f9d4d062baf3a77dcce835f919ce072d59aad294d624e728d37fe84625cf2d8",
   "embed_dim": 128,
   "st_depth": 4,
   "num_cross_layers": 2,
