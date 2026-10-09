@@ -21,8 +21,10 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO_ROOT, "backend"))
 
 from core.hf_jvc_release import (  # noqa: E402
-    CHECKPOINT_FILENAME,
+    HUB_CHECKPOINT_FILENAME,
+    LOCAL_CHECKPOINT_FILENAME,
     PREVIOUS_HF_REPO_NAME,
+    PREVIOUS_HUB_CHECKPOINT_FILENAME,
     build_config,
     checkpoint_path,
     default_repo_id,
@@ -39,7 +41,7 @@ def write_card_files(dest: str, *, include_checkpoint: bool) -> str:
     if is_lfs_pointer(src):
         raise SystemExit(
             f"{src} is still a Git LFS pointer. Run "
-            "`git lfs pull --include=backend/models/badminton_model_k_st_vit.pth` first."
+            f"`git lfs pull --include=backend/models/{LOCAL_CHECKPOINT_FILENAME}` first."
         )
     meta = meta_from_checkpoint(src)
     config = build_config(meta, default_repo_id())
@@ -50,7 +52,7 @@ def write_card_files(dest: str, *, include_checkpoint: bool) -> str:
     with open(os.path.join(dest, "README.md"), "w", encoding="utf-8") as f:
         f.write(render_model_card(config))
     if include_checkpoint:
-        shutil.copy2(src, os.path.join(dest, CHECKPOINT_FILENAME))
+        shutil.copy2(src, os.path.join(dest, HUB_CHECKPOINT_FILENAME))
     return config["checkpoint_sha256"]
 
 
@@ -87,7 +89,8 @@ def upload_folder(folder: str, repo_id: str, token: str) -> str:
         folder_path=folder,
         repo_id=repo_id,
         repo_type="model",
-        commit_message="Update the JVC model card",
+        commit_message="Publish the checkpoint as jvc.pth",
+        delete_patterns=PREVIOUS_HUB_CHECKPOINT_FILENAME,
     )
     return f"https://huggingface.co/{repo_id}"
 

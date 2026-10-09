@@ -12,7 +12,7 @@ REPO = os.path.dirname(BACKEND)
 sys.path.insert(0, BACKEND)
 
 from core.hf_jvc_release import (  # noqa: E402
-    CHECKPOINT_FILENAME,
+    HUB_CHECKPOINT_FILENAME,
     TASK_LABELS,
     build_config,
     checkpoint_path,
@@ -57,9 +57,10 @@ def test_config_and_card_describe_the_paper_checkpoint():
     assert 'hf_hub_download("navneethdg/JVC"' in card
     assert "dhamotharan2026jvc" in card
     assert "https://openreview.net/pdf?id=XJEhcXfwEe" in card
-    assert CHECKPOINT_FILENAME in card
+    assert HUB_CHECKPOINT_FILENAME in card
     assert "80.61%" in card
-    assert "k_st_vit" in card
+    assert "k_st_vit" not in card.lower()
+    assert "kstvit" not in card.lower()
     assert "https://isocourt.fit" in card
     assert "BadCoach" not in card
     assert "badcoach" not in card.lower()

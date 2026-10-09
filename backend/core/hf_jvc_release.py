@@ -19,7 +19,11 @@ PREVIOUS_HF_REPO_NAME = "isocourt-jvc"
 DEMO_URL = "https://isocourt.fit"
 CODE_URL = "https://github.com/Navneethd8/IsoCourt"
 DATASET_ID = "Moujuruo/Finebadminton-20K"
-CHECKPOINT_FILENAME = "badminton_model_k_st_vit.pth"
+# Training artifact in this repo. The Hub file is published under a separate name.
+LOCAL_CHECKPOINT_FILENAME = "badminton_model_k_st_vit.pth"
+HUB_CHECKPOINT_FILENAME = "jvc.pth"
+# Older Hub filename, removed on the next publish.
+PREVIOUS_HUB_CHECKPOINT_FILENAME = "badminton_model_k_st_vit.pth"
 PAPER_TITLE = "JVC: Joint Vision Cross-Attention for Fine-Grained Badminton Stroke Recognition"
 PAPER_URL = "https://openreview.net/forum?id=XJEhcXfwEe"
 PAPER_PDF_URL = "https://openreview.net/pdf?id=XJEhcXfwEe"
@@ -106,7 +110,7 @@ def default_repo_id() -> str:
 
 
 def checkpoint_path(repo_root: str) -> str:
-    return os.path.join(os.path.abspath(repo_root), "backend", "models", CHECKPOINT_FILENAME)
+    return os.path.join(os.path.abspath(repo_root), "backend", "models", LOCAL_CHECKPOINT_FILENAME)
 
 
 def sha256_file(path: str) -> str:
@@ -154,12 +158,9 @@ def build_config(meta: Mapping[str, Any], repo_id: str) -> Dict[str, Any]:
     acc = round(float(meta["best_acc"]), 2)
     return {
         "architecture": "jvc",
-        "code_architecture": "k_st_vit",
         "paper_name": "JVC",
-        "implementation": "K-STViT",
         "repo_id": repo_id,
-        "checkpoint": CHECKPOINT_FILENAME,
-        "checkpoint_key": "k_st_vit",
+        "checkpoint": HUB_CHECKPOINT_FILENAME,
         "checkpoint_sha256": meta["checkpoint_sha256"],
         "embed_dim": int(meta["embed_dim"]),
         "st_depth": int(meta["st_depth"]),
@@ -234,7 +235,7 @@ model-index:
 
 Main checkpoint for [{PAPER_TITLE}]({PAPER_URL}) ([PDF]({PAPER_PDF_URL})). Navneeth Dhamotharan and Bin Han, {PAPER_VENUE}, {PAPER_YEAR}.
 
-The released weight is the joint-vision cross-attention model (code name K-STViT).
+The released weight is the joint-vision cross-attention model.
 
 A 16-frame hit clip goes through two encoders: R(2+1)D Conv3D for RGB patches, and a four-stream SkateFormer for MediaPipe joints. Joint tokens cross-attend to visual patches, a divided space–time transformer mixes the clip, and contact-weighted pooling feeds multitask heads. The paper metric is **9-way `stroke_type`**.
 
@@ -276,7 +277,7 @@ from core.hf_jvc_release import load_published_jvc
 
 STROKE_TYPE = {stroke_literal}
 
-path = hf_hub_download("{repo_id}", "{CHECKPOINT_FILENAME}")
+path = hf_hub_download("{repo_id}", "{HUB_CHECKPOINT_FILENAME}")
 model = load_published_jvc(path)  # eval mode; Conv3D weights come from the checkpoint
 
 frames = torch.zeros(1, 16, 3, 224, 224)  # RGB, ImageNet-normalized
@@ -297,14 +298,14 @@ Heads return logits, not probabilities.
 
 | File | Role |
 | --- | --- |
-| `{CHECKPOINT_FILENAME}` | Training checkpoint. State dict is under the `k_st_vit` key, with constructor metadata beside it. |
+| `{HUB_CHECKPOINT_FILENAME}` | Checkpoint. Constructor metadata sits beside the weights. |
 | `config.json` | Architecture, label names, metric, and SHA-256 of the checkpoint. |
 
-SHA-256 of `{CHECKPOINT_FILENAME}`: `{config["checkpoint_sha256"]}`
+SHA-256 of `{HUB_CHECKPOINT_FILENAME}`: `{config["checkpoint_sha256"]}`
 
 ## What this weight is
 
-Registry category `k_st_vit`, file `{CHECKPOINT_FILENAME}`. Vision backbone `{config["video_backbone"]}` (`{config["vision_backbone"]}`), embed dim {config["embed_dim"]}, {config["num_cross_layers"]} cross-attention layers, {config["st_depth"]} divided space–time blocks, four-stream skeleton. Shuttle features are off.
+Vision backbone `{config["video_backbone"]}` (`{config["vision_backbone"]}`), embed dim {config["embed_dim"]}, {config["num_cross_layers"]} cross-attention layers, {config["st_depth"]} divided space–time blocks, four-stream skeleton. Shuttle features are off.
 
 No-cross-attention JVC ablations are separate runs and are not this file.
 

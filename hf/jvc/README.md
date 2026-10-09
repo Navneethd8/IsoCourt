@@ -27,7 +27,7 @@ model-index:
 
 Main checkpoint for [JVC: Joint Vision Cross-Attention for Fine-Grained Badminton Stroke Recognition](https://openreview.net/forum?id=XJEhcXfwEe) ([PDF](https://openreview.net/pdf?id=XJEhcXfwEe)). Navneeth Dhamotharan and Bin Han, ECCV 2026 Workshop: Human Motion-Informed World Models and Socially Intelligent Action, 2026.
 
-The released weight is the joint-vision cross-attention model (code name K-STViT).
+The released weight is the joint-vision cross-attention model.
 
 A 16-frame hit clip goes through two encoders: R(2+1)D Conv3D for RGB patches, and a four-stream SkateFormer for MediaPipe joints. Joint tokens cross-attend to visual patches, a divided space–time transformer mixes the clip, and contact-weighted pooling feeds multitask heads. The paper metric is **9-way `stroke_type`**.
 
@@ -69,7 +69,7 @@ from core.hf_jvc_release import load_published_jvc
 
 STROKE_TYPE = ["Serve", "Clear", "Smash", "Drop", "Drive", "Net_Shot", "Lob", "Defensive_Shot", "Other"]
 
-path = hf_hub_download("navneethdg/JVC", "badminton_model_k_st_vit.pth")
+path = hf_hub_download("navneethdg/JVC", "jvc.pth")
 model = load_published_jvc(path)  # eval mode; Conv3D weights come from the checkpoint
 
 frames = torch.zeros(1, 16, 3, 224, 224)  # RGB, ImageNet-normalized
@@ -90,14 +90,14 @@ Heads return logits, not probabilities.
 
 | File | Role |
 | --- | --- |
-| `badminton_model_k_st_vit.pth` | Training checkpoint. State dict is under the `k_st_vit` key, with constructor metadata beside it. |
+| `jvc.pth` | Checkpoint. Constructor metadata sits beside the weights. |
 | `config.json` | Architecture, label names, metric, and SHA-256 of the checkpoint. |
 
-SHA-256 of `badminton_model_k_st_vit.pth`: `5f9d4d062baf3a77dcce835f919ce072d59aad294d624e728d37fe84625cf2d8`
+SHA-256 of `jvc.pth`: `5f9d4d062baf3a77dcce835f919ce072d59aad294d624e728d37fe84625cf2d8`
 
 ## What this weight is
 
-Registry category `k_st_vit`, file `badminton_model_k_st_vit.pth`. Vision backbone `r2plus1d_18` (`conv3d`), embed dim 128, 2 cross-attention layers, 4 divided space–time blocks, four-stream skeleton. Shuttle features are off.
+Vision backbone `r2plus1d_18` (`conv3d`), embed dim 128, 2 cross-attention layers, 4 divided space–time blocks, four-stream skeleton. Shuttle features are off.
 
 No-cross-attention JVC ablations are separate runs and are not this file.
 
