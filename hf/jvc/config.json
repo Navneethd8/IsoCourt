@@ -3,7 +3,7 @@
   "code_architecture": "k_st_vit",
   "paper_name": "JVC",
   "implementation": "K-STViT",
-  "repo_id": "navneethdg/isocourt-jvc",
+  "repo_id": "navneethdg/JVC",
   "checkpoint": "badminton_model_k_st_vit.pth",
   "checkpoint_key": "k_st_vit",
   "checkpoint_sha256": "5f9d4d062baf3a77dcce835f919ce072d59aad294d624e728d37fe84625cf2d8",
@@ -122,5 +122,16 @@
   },
   "dataset": "Moujuruo/Finebadminton-20K",
   "demo_space": "https://huggingface.co/spaces/navneethdg/BadCoach",
-  "code": "https://github.com/Navneethd8/IsoCourt"
+  "code": "https://github.com/Navneethd8/IsoCourt",
+  "paper": {
+    "title": "JVC: Joint Vision Cross-Attention for Fine-Grained Badminton Stroke Recognition",
+    "url": "https://openreview.net/forum?id=XJEhcXfwEe",
+    "pdf": "https://openreview.net/pdf?id=XJEhcXfwEe",
+    "authors": [
+      "Navneeth Dhamotharan",
+      "Bin Han"
+    ],
+    "year": 2026,
+    "venue": "ECCV 2026 Workshop: Human Motion-Informed World Models and Socially Intelligent Action"
+  }
 }

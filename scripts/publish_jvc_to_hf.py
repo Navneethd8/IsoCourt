@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Publish the paper JVC (K-STViT) checkpoint to the Hugging Face Hub.
 
-Writes ``hf/isocourt-jvc/config.json`` and ``README.md`` from the checkpoint, and
-uploads that folder plus the weight when ``HF_TOKEN`` is set.
+Writes ``hf/jvc/config.json`` and ``README.md`` from the checkpoint, and
+uploads that folder plus the weight when ``HF_TOKEN`` is set. The Hub repo
+is ``<user>/JVC``. An older ``<user>/isocourt-jvc`` repo is renamed first.
 
   python scripts/publish_jvc_to_hf.py --write-card
   HF_TOKEN=... python scripts/publish_jvc_to_hf.py
@@ -21,6 +22,7 @@ sys.path.insert(0, os.path.join(REPO_ROOT, "backend"))
 
 from core.hf_jvc_release import (  # noqa: E402
     CHECKPOINT_FILENAME,
+    PREVIOUS_HF_REPO_NAME,
     build_config,
     checkpoint_path,
     default_repo_id,
@@ -29,7 +31,7 @@ from core.hf_jvc_release import (  # noqa: E402
     render_model_card,
 )
 
-CARD_DIR = os.path.join(REPO_ROOT, "hf", "isocourt-jvc")
+CARD_DIR = os.path.join(REPO_ROOT, "hf", "jvc")
 
 
 def write_card_files(dest: str, *, include_checkpoint: bool) -> str:
@@ -52,16 +54,29 @@ def write_card_files(dest: str, *, include_checkpoint: bool) -> str:
     return config["checkpoint_sha256"]
 
 
+def _rename_previous_repo(api, repo_id: str) -> None:
+    """Move ``user/isocourt-jvc`` to ``user/JVC`` when the old repo is still there."""
+    user = repo_id.split("/", 1)[0]
+    old_id = f"{user}/{PREVIOUS_HF_REPO_NAME}"
+    if old_id.lower() == repo_id.lower():
+        return
+    if not api.repo_exists(old_id, repo_type="model"):
+        return
+    api.move_repo(from_id=old_id, to_id=repo_id, repo_type="model")
+    print(f"Renamed {old_id} -> {repo_id}")
+
+
 def upload_folder(folder: str, repo_id: str, token: str) -> str:
     from huggingface_hub import HfApi
 
     api = HfApi(token=token)
+    _rename_previous_repo(api, repo_id)
     api.create_repo(repo_id, repo_type="model", exist_ok=True, private=False)
     api.upload_folder(
         folder_path=folder,
         repo_id=repo_id,
         repo_type="model",
-        commit_message="Publish JVC (K-STViT) checkpoint",
+        commit_message="Rename the model to JVC and add the paper citation",
     )
     return f"https://huggingface.co/{repo_id}"
 
@@ -71,7 +86,7 @@ def main() -> None:
     parser.add_argument(
         "--write-card",
         action="store_true",
-        help="Regenerate hf/isocourt-jvc/config.json and README.md from the checkpoint.",
+        help="Regenerate hf/jvc/config.json and README.md from the checkpoint.",
     )
     parser.add_argument(
         "--dry-run",
@@ -92,12 +107,12 @@ def main() -> None:
         if not token and not args.dry_run and not args.write_card:
             raise SystemExit("Set HF_TOKEN to upload, or pass --write-card / --dry-run.")
         if args.dry_run:
-            stage = tempfile.mkdtemp(prefix="isocourt-jvc-")
+            stage = tempfile.mkdtemp(prefix="jvc-")
             digest = write_card_files(stage, include_checkpoint=True)
             print(f"Staged {repo_id} at {stage} (sha256 {digest})")
         return
 
-    stage = tempfile.mkdtemp(prefix="isocourt-jvc-")
+    stage = tempfile.mkdtemp(prefix="jvc-")
     try:
         digest = write_card_files(stage, include_checkpoint=True)
         url = upload_folder(stage, repo_id, token)

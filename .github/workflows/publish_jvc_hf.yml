@@ -2,6 +2,9 @@ name: Publish JVC model to Hugging Face
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - cursor/publish-jvc-hf-9443
 
 jobs:
   publish:
@@ -24,7 +27,7 @@ jobs:
           pip install huggingface_hub
           pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-      - name: Publish navneethdg/isocourt-jvc
+      - name: Publish navneethdg/JVC
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_USERNAME: ${{ secrets.HF_USERNAME }}

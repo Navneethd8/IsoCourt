@@ -13,11 +13,29 @@ from typing import Any, Dict, Mapping
 
 # Hub repo published by scripts/publish_jvc_to_hf.py and the GitHub Action.
 DEFAULT_HF_USER = "navneethdg"
-DEFAULT_HF_REPO_NAME = "isocourt-jvc"
+DEFAULT_HF_REPO_NAME = "JVC"
+# Previous id, moved on the next publish.
+PREVIOUS_HF_REPO_NAME = "isocourt-jvc"
 DEMO_SPACE_URL = "https://huggingface.co/spaces/navneethdg/BadCoach"
 CODE_URL = "https://github.com/Navneethd8/IsoCourt"
 DATASET_ID = "Moujuruo/Finebadminton-20K"
 CHECKPOINT_FILENAME = "badminton_model_k_st_vit.pth"
+PAPER_TITLE = "JVC: Joint Vision Cross-Attention for Fine-Grained Badminton Stroke Recognition"
+PAPER_URL = "https://openreview.net/forum?id=XJEhcXfwEe"
+PAPER_PDF_URL = "https://openreview.net/pdf?id=XJEhcXfwEe"
+PAPER_AUTHORS = ("Navneeth Dhamotharan", "Bin Han")
+PAPER_YEAR = 2026
+PAPER_VENUE = (
+    "ECCV 2026 Workshop: Human Motion-Informed World Models and Socially Intelligent Action"
+)
+PAPER_BIBTEX = """@inproceedings{
+dhamotharan2026jvc,
+title={{JVC}: Joint Vision Cross-Attention for Fine-Grained Badminton Stroke Recognition},
+author={Navneeth Dhamotharan and Bin Han},
+booktitle={ECCV26 Workshop: Human Motion-Informed World Models and Socially Intelligent Action},
+year={2026},
+url={https://openreview.net/forum?id=XJEhcXfwEe}
+}"""
 
 # Label order matches FineBadmintonDataset (backend/core/dataset.py).
 # stroke_subtype is not a head on this checkpoint.
@@ -170,6 +188,14 @@ def build_config(meta: Mapping[str, Any], repo_id: str) -> Dict[str, Any]:
         "dataset": DATASET_ID,
         "demo_space": DEMO_SPACE_URL,
         "code": CODE_URL,
+        "paper": {
+            "title": PAPER_TITLE,
+            "url": PAPER_URL,
+            "pdf": PAPER_PDF_URL,
+            "authors": list(PAPER_AUTHORS),
+            "year": PAPER_YEAR,
+            "venue": PAPER_VENUE,
+        },
     }
 
 
@@ -204,9 +230,11 @@ model-index:
             value: {acc}
 ---
 
-# JVC (joint-to-vision cross-attention)
+# JVC
 
-This is the main **JVC** checkpoint from the IsoCourt badminton paper, implemented as **K-STViT**.
+Main checkpoint for [{PAPER_TITLE}]({PAPER_URL}) ([PDF]({PAPER_PDF_URL})). Navneeth Dhamotharan and Bin Han, {PAPER_VENUE}, {PAPER_YEAR}.
+
+The released weight is the joint-vision cross-attention model (code name K-STViT).
 
 A 16-frame hit clip goes through two encoders: R(2+1)D Conv3D for RGB patches, and a four-stream SkateFormer for MediaPipe joints. Joint tokens cross-attend to visual patches, a divided space–time transformer mixes the clip, and contact-weighted pooling feeds multitask heads. The paper metric is **9-way `stroke_type`**.
 
@@ -217,6 +245,7 @@ A 16-frame hit clip goes through two encoders: R(2+1)D Conv3D for RGB patches, a
 | Dataset | [FineBadminton-20K](https://huggingface.co/datasets/{DATASET_ID}) |
 | Frames | 16, `span_linspace` over the hit span, 224×224, ImageNet normalization |
 | Skeleton | MediaPipe BlazePose, 33 joints × (x, y, z), four-stream (joint, bone, joint-motion, bone-motion) |
+| Paper | [{PAPER_TITLE}]({PAPER_URL}) |
 | Demo | [{DEMO_SPACE_URL}]({DEMO_SPACE_URL}) |
 | Code | [{CODE_URL}]({CODE_URL}) |
 
@@ -278,6 +307,12 @@ SHA-256 of `{CHECKPOINT_FILENAME}`: `{config["checkpoint_sha256"]}`
 Registry category `k_st_vit`, file `{CHECKPOINT_FILENAME}`. Vision backbone `{config["video_backbone"]}` (`{config["vision_backbone"]}`), embed dim {config["embed_dim"]}, {config["num_cross_layers"]} cross-attention layers, {config["st_depth"]} divided space–time blocks, four-stream skeleton. Shuttle features are off.
 
 No-cross-attention JVC ablations are separate runs and are not this file.
+
+## Citation
+
+```bibtex
+{PAPER_BIBTEX}
+```
 """
 
 

@@ -46,13 +46,17 @@ def test_stroke_labels_match_shared_map():
 
 
 def test_config_and_card_describe_the_paper_checkpoint():
-    config = build_config(_sample_meta(), "navneethdg/isocourt-jvc")
+    config = build_config(_sample_meta(), "navneethdg/JVC")
     assert config["architecture"] == "jvc"
+    assert config["repo_id"] == "navneethdg/JVC"
+    assert config["paper"]["url"] == "https://openreview.net/forum?id=XJEhcXfwEe"
     assert config["metrics"]["stroke_type_val_acc"] == 80.61
     assert config["labels"]["stroke_type"][2] == "Smash"
     assert config["task_classes"]["stroke_type"] == 9
     card = render_model_card(config)
-    assert "hf_hub_download(\"navneethdg/isocourt-jvc\"" in card
+    assert 'hf_hub_download("navneethdg/JVC"' in card
+    assert "dhamotharan2026jvc" in card
+    assert "https://openreview.net/pdf?id=XJEhcXfwEe" in card
     assert CHECKPOINT_FILENAME in card
     assert "80.61%" in card
     assert "k_st_vit" in card
@@ -64,8 +68,8 @@ def test_committed_card_matches_checkpoint_when_weights_are_present():
         pytest.skip("JVC checkpoint is a Git LFS pointer in this checkout")
     from core.hf_jvc_release import meta_from_checkpoint
 
-    config = build_config(meta_from_checkpoint(path), "navneethdg/isocourt-jvc")
-    card_dir = os.path.join(REPO, "hf", "isocourt-jvc")
+    config = build_config(meta_from_checkpoint(path), "navneethdg/JVC")
+    card_dir = os.path.join(REPO, "hf", "jvc")
     with open(os.path.join(card_dir, "config.json"), encoding="utf-8") as f:
         committed = json.load(f)
     assert committed == config
