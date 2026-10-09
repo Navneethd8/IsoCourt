@@ -55,14 +55,25 @@ def write_card_files(dest: str, *, include_checkpoint: bool) -> str:
 
 
 def _rename_previous_repo(api, repo_id: str) -> None:
-    """Move ``user/isocourt-jvc`` to ``user/JVC`` when the old repo is still there."""
+    """Move ``user/isocourt-jvc`` to ``user/JVC`` when the old repo is still there.
+
+    A redirect from the old name still reports the repo as existing after the
+    move, so skip the move once the JVC repo itself is present.
+    """
+    from huggingface_hub.errors import RepositoryNotFoundError
+
     user = repo_id.split("/", 1)[0]
     old_id = f"{user}/{PREVIOUS_HF_REPO_NAME}"
     if old_id.lower() == repo_id.lower():
         return
+    if api.repo_exists(repo_id, repo_type="model"):
+        return
     if not api.repo_exists(old_id, repo_type="model"):
         return
-    api.move_repo(from_id=old_id, to_id=repo_id, repo_type="model")
+    try:
+        api.move_repo(from_id=old_id, to_id=repo_id, repo_type="model")
+    except RepositoryNotFoundError:
+        return
     print(f"Renamed {old_id} -> {repo_id}")
 
 
