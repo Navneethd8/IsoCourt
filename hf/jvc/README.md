@@ -37,7 +37,7 @@ A 16-frame hit clip goes through two encoders: R(2+1)D Conv3D for RGB patches, a
 | Split | Video-level 80/20, seed 42. No clip from a validation video is in training. |
 | Dataset | [FineBadminton-20K](https://huggingface.co/datasets/Moujuruo/Finebadminton-20K) |
 | Frames | 16, `span_linspace` over the hit span, 224×224, ImageNet normalization |
-| Skeleton | MediaPipe BlazePose, 33 joints × (x, y, z), four-stream (joint, bone, joint-motion, bone-motion) |
+| Skeleton | MediaPipe, 33 joints × (x, y, z), four-stream (joint, bone, joint-motion, bone-motion) |
 | Paper | [JVC: Joint Vision Cross-Attention for Fine-Grained Badminton Stroke Recognition](https://openreview.net/forum?id=XJEhcXfwEe) |
 | Demo | [isocourt.fit](https://isocourt.fit) |
 

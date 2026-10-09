@@ -89,7 +89,7 @@ def upload_folder(folder: str, repo_id: str, token: str) -> str:
         folder_path=folder,
         repo_id=repo_id,
         repo_type="model",
-        commit_message="Drop the GitHub link from the JVC model card",
+        commit_message="Update the JVC model card",
         delete_patterns=PREVIOUS_HUB_CHECKPOINT_FILENAME,
     )
     return f"https://huggingface.co/{repo_id}"

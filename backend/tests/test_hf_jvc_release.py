@@ -66,6 +66,7 @@ def test_config_and_card_describe_the_paper_checkpoint():
     assert "badcoach" not in card.lower()
     assert "github.com" not in card
     assert "IsoCourt" not in card
+    assert "blazepose" not in card.lower()
 
 
 def test_committed_card_matches_checkpoint_when_weights_are_present():
