@@ -12,6 +12,7 @@ import torch
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
 from api import state
+from api.coaching_text import live_coaching_prompt, live_cue_worth_saying, plain_coaching_text
 from api.inference import run_stroke_model
 
 router = APIRouter(tags=["live"])
@@ -129,97 +130,28 @@ _COMMENTARY_CACHE_MAX = 128
 _gemini_backoff_until: float = 0.0
 _GEMINI_BACKOFF_SECONDS = 30
 
-# Short tips only: live commentary must pass _live_commentary_acceptable (≤10 words, one sentence).
-_FALLBACK_TIPS: dict[str, list[str]] = {
-    "Serve": [
-        "Snap your wrist at contact for a tighter serve.",
-        "Serve deep toward their back tramline.",
-        "Vary short serves with occasional flicks.",
-    ],
-    "Smash": [
-        "Drive through with your hips on smashes.",
-        "Aim smashes at the body or sidelines.",
-        "Meet the shuttle at your highest reach.",
-    ],
-    "Clear": [
-        "Finish high through contact on clears.",
-        "Send clears deep to the baseline.",
-        "Recover quickly to centre after clears.",
-    ],
-    "Drop": [
-        "Match drop preparation to your clear.",
-        "Brush the shuttle softly over the tape.",
-        "Follow your drop tight behind the shuttle.",
-    ],
-    "Net_Shot": [
-        "Relax your grip above the net tape.",
-        "Take net balls high and as early as possible.",
-        "Stay balanced on the balls of your feet.",
-    ],
-    "Drive": [
-        "Punch flat drives compactly from the elbow.",
-        "Open the court with cross-court drives.",
-        "Keep swings short in fast drive exchanges.",
-    ],
-    "Lob": [
-        "Lob high and deep to buy recovery time.",
-        "Mix high defensive lobs with attacking ones.",
-        "Push out of the lunge back toward centre.",
-    ],
-    "Defensive_Shot": [
-        "Keep the racket up with compact swings.",
-        "Avoid lifting defensively into mid-court.",
-        "Stay low and wide when you defend.",
-    ],
-}
-_FALLBACK_GENERIC = [
-    "Reach the shuttle early every rally.",
-    "Balance your ready stance between rallies.",
-    "Move your feet before you swing.",
-]
-_fallback_counters: dict[str, int] = {}
-
-_BREAK_ENCOURAGEMENTS = [
-    "Nice effort so far — use this break to reset and stay loose.",
-    "Good work out there. Shake it off and get ready for the next rally.",
-    "Take a breath, stay focused. You're building good habits.",
-    "Solid session — keep that intensity when play picks back up.",
-    "Stay light on your feet during the break, you're doing well.",
-]
-_break_enc_idx = 0
-
-_SESSION_END_MESSAGES = [
-    "Great session! Every rep on court makes you sharper — see you next time.",
-    "That's a wrap. You put in the work today, and it shows.",
-    "Session complete. Keep hitting the court and the improvements will stack up.",
-    "Well played. Review your timeline and come back ready to level up.",
-    "Good stuff today. Rest up and bring that energy back next session.",
-]
-_session_end_idx = 0
-
-
-def _get_fallback_tip(stroke: str) -> str:
-    tips = _FALLBACK_TIPS.get(stroke, _FALLBACK_GENERIC)
-    idx = _fallback_counters.get(stroke, 0) % len(tips)
-    _fallback_counters[stroke] = idx + 1
-    return tips[idx]
-
-
 def _result_signature(result: dict) -> str:
     m = result.get("metrics", {})
+
+    def lab(key):
+        value = m.get(key, {})
+        if isinstance(value, dict):
+            return value.get("label", "?")
+        return value or "?"
+
+    band = "low" if float(result.get("confidence") or 0) < 0.5 else "ok"
     return (
-        f"{result.get('label', '?')}|"
-        f"{m.get('technique', {}).get('label', '?')}|"
-        f"{m.get('placement', {}).get('label', '?')}|"
-        f"{m.get('quality', '?')}"
+        f"{result.get('label', '?')}|{lab('subtype')}|{lab('technique')}|"
+        f"{lab('placement')}|{lab('position')}|{lab('intent')}|{m.get('quality', '?')}|{band}"
     )
 
 
-_LIVE_COMMENTARY_MAX_WORDS = 10
+_LIVE_COMMENTARY_MAX_WORDS = 8
+_LIVE_COMMENTARY_GAP_S = 8.0
 
 
 def _live_commentary_acceptable(text: str) -> bool:
-    """At most 10 words; one complete sentence ending in . ! or ?"""
+    """At most 8 words; one complete sentence ending in . ! or ?"""
     t = text.strip()
     if not t or t[-1] not in ".!?":
         return False
@@ -227,7 +159,7 @@ def _live_commentary_acceptable(text: str) -> bool:
 
 
 async def _generate_commentary(result: dict) -> str:
-    """Cached Gemini coaching tip with fallback to canned tips."""
+    """One short Gemini cue. Silence when the model cannot give one."""
     global _gemini_backoff_until
 
     sig = _result_signature(result)
@@ -237,31 +169,14 @@ async def _generate_commentary(result: dict) -> str:
             return cached
         del _commentary_cache[sig]
 
-    stroke = result.get("label", "Other")
-
     if not state.gemini_enabled or not state.gemini_client:
-        tip = _get_fallback_tip(stroke)
-        return tip if _live_commentary_acceptable(tip) else ""
+        return ""
 
     if time.monotonic() < _gemini_backoff_until:
-        tip = _get_fallback_tip(stroke)
-        return tip if _live_commentary_acceptable(tip) else ""
+        return ""
 
     try:
-        m = result.get("metrics", {})
-        prompt = (
-            "You are a live badminton coach giving real-time courtside feedback. "
-            f"Reply with exactly ONE complete sentence, at most {_LIVE_COMMENTARY_MAX_WORDS} words total — hard limit. "
-            "It must end with a single period, question mark, or exclamation mark. "
-            "One specific actionable technical tip only: no encouragement, praise, filler, lists, or markdown. "
-            "Vary vocabulary; do not overuse one verb (e.g. 'rotate') unless it is clearly best.\n\n"
-            f"Stroke: {stroke}, "
-            f"Technique: {m.get('technique', {}).get('label', '?')}, "
-            f"Placement: {m.get('placement', {}).get('label', '?')}, "
-            f"Position: {m.get('position', {}).get('label', '?')}, "
-            f"Intent: {m.get('intent', {}).get('label', '?')}, "
-            f"Quality: {m.get('quality', '?')}"
-        )
+        prompt = live_coaching_prompt(result, _LIVE_COMMENTARY_MAX_WORDS)
         resp = await asyncio.to_thread(
             state.gemini_client.models.generate_content,
             model=state.gemini_model_name,
@@ -272,15 +187,14 @@ async def _generate_commentary(result: dict) -> str:
         if resp.candidates:
             candidate = resp.candidates[0]
             if candidate.content and candidate.content.parts:
-                text = resp.text.strip().lstrip("*-•").strip()
+                text = plain_coaching_text(resp.text).split("\n", 1)[0].strip()
 
         if not text:
             reason = "no_candidates"
             if resp.candidates:
                 reason = getattr(resp.candidates[0], "finish_reason", "unknown")
-            print(f"[live] gemini: empty response ({reason}) — using fallback")
-            tip = _get_fallback_tip(stroke)
-            return tip if _live_commentary_acceptable(tip) else ""
+            print(f"[live] gemini: empty response ({reason})")
+            return ""
 
         if not _live_commentary_acceptable(text):
             n = len(text.split())
@@ -304,8 +218,7 @@ async def _generate_commentary(result: dict) -> str:
             print(f"[live] gemini: 503 unavailable — backing off {_GEMINI_BACKOFF_SECONDS}s")
         else:
             print(f"[live] gemini exception: {e}")
-        tip = _get_fallback_tip(stroke)
-        return tip if _live_commentary_acceptable(tip) else ""
+        return ""
 
 
 @router.websocket("/sessions/{session_id}/ws")
@@ -326,6 +239,8 @@ async def live_session_ws(ws: WebSocket, session_id: str):
     ring_lock = asyncio.Lock()
     bg_tasks: set[asyncio.Task] = set()
     last_commentary_sig: str | None = None
+    last_commentary_at = 0.0
+    pending_result: dict | None = None
     closed = asyncio.Event()
     frame_count = 0
 
@@ -341,7 +256,7 @@ async def live_session_ws(ws: WebSocket, session_id: str):
             print(f"[live] commentary error: {e}")
 
     async def _inference_loop():
-        nonlocal last_commentary_sig
+        nonlocal last_commentary_sig, last_commentary_at, pending_result
         first_sent = False
         was_break = False
         cycle = 0
@@ -384,16 +299,12 @@ async def live_session_ws(ws: WebSocket, session_id: str):
 
                 if result["badminton_prob"] < BADMINTON_PROB_MIN:
                     if not was_break:
-                        global _break_enc_idx
                         print(f"[live] break detected (badminton_prob={result['badminton_prob']:.2f})")
                         await ws.send_json({
                             "event": "break",
                             "reason": "game_break",
                             "message": "Break in play detected — waiting for action to resume.",
                         })
-                        enc = _BREAK_ENCOURAGEMENTS[_break_enc_idx % len(_BREAK_ENCOURAGEMENTS)]
-                        _break_enc_idx += 1
-                        await ws.send_json({"event": "commentary", "text": enc})
                         was_break = True
                     cycle += 1
                     continue
@@ -401,12 +312,21 @@ async def live_session_ws(ws: WebSocket, session_id: str):
                 was_break = False
                 await ws.send_json({"event": "analysis", **result})
 
-                sig = _result_signature(result)
-                if sig != last_commentary_sig:
-                    last_commentary_sig = sig
-                    task = asyncio.create_task(_send_commentary(result))
-                    bg_tasks.add(task)
-                    task.add_done_callback(bg_tasks.discard)
+                if live_cue_worth_saying(result):
+                    pending_result = result
+                if (
+                    pending_result is not None
+                    and time.monotonic() - last_commentary_at >= _LIVE_COMMENTARY_GAP_S
+                ):
+                    sig = _result_signature(pending_result)
+                    cue = pending_result
+                    pending_result = None
+                    if sig != last_commentary_sig:
+                        last_commentary_sig = sig
+                        last_commentary_at = time.monotonic()
+                        task = asyncio.create_task(_send_commentary(cue))
+                        bg_tasks.add(task)
+                        task.add_done_callback(bg_tasks.discard)
             except Exception as e:
                 print(f"[live] inference error: {e}")
             cycle += 1
@@ -441,14 +361,6 @@ async def live_session_ws(ws: WebSocket, session_id: str):
         inference_task.cancel()
         for t in bg_tasks:
             t.cancel()
-        if frame_count > RING_SIZE:
-            try:
-                global _session_end_idx
-                msg = _SESSION_END_MESSAGES[_session_end_idx % len(_SESSION_END_MESSAGES)]
-                _session_end_idx += 1
-                await ws.send_json({"event": "commentary", "text": msg})
-            except Exception:
-                pass
         print(f"[live] session {session_id} cleaned up ({frame_count} total frames)")
         async with state._live_lock:
             if session_id in state._live_sessions:

@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react'
 import { Icon } from './AnalyzeIcon'
 import { getQualityColor } from '../useAnalyzeController'
+import { plainCoachText } from '../plainCoachText'
 
 export default function AnalyzeFrameLightbox({
     lightboxEvent,
@@ -127,7 +128,7 @@ export default function AnalyzeFrameLightbox({
                                     <span className="text-xs italic app-lightbox-label">Generating tip...</span>
                                 </div>
                             ) : frameTip ? (
-                                <p className="text-sm leading-relaxed app-lightbox-body">{frameTip}</p>
+                                <p className="text-sm leading-relaxed app-lightbox-body">{plainCoachText(frameTip)}</p>
                             ) : (
                                 <p className="text-xs italic app-lightbox-label">Tip unavailable</p>
                             )}

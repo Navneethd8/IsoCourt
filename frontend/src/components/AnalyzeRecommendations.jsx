@@ -1,4 +1,5 @@
 import { Icon } from './AnalyzeIcon'
+import { plainCoachText } from '../plainCoachText'
 
 export default function AnalyzeRecommendations({ recommendations }) {
     return (
@@ -8,12 +9,15 @@ export default function AnalyzeRecommendations({ recommendations }) {
                 Coach's Recommendations
             </span>
             <ul className="space-y-2">
-                {recommendations.map((tip) => (
-                    <li key={tip} className="app-coach-panel__item">
-                        <span className="text-brand mt-1">•</span>
-                        {tip}
-                    </li>
-                ))}
+                {recommendations.map((tip, index) => {
+                    const text = plainCoachText(tip)
+                    return (
+                        <li key={`${index}-${text}`} className="app-coach-panel__item">
+                            <span className="text-brand mt-1">•</span>
+                            {text}
+                        </li>
+                    )
+                })}
             </ul>
         </div>
     )

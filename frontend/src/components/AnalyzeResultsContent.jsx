@@ -1,6 +1,7 @@
 import { Icon } from './AnalyzeIcon'
 import AnalyzeLoadingStepChips from './AnalyzeLoadingStepChips'
 import AnalyzeResultSummary from './AnalyzeResultSummary'
+import AnalyzeCourtHeatmap from './AnalyzeCourtHeatmap'
 import AnalyzeRecommendations from './AnalyzeRecommendations'
 import AnalyzeTimeline from './AnalyzeTimeline'
 
@@ -9,8 +10,6 @@ export default function AnalyzeResultsContent({
     loadingStep,
     loadingSteps,
     displayTimeline,
-    preview,
-    videoRef,
     getQualityColor,
     getQualityBarColor,
     timelineHasPoseFrames,
@@ -35,21 +34,6 @@ export default function AnalyzeResultsContent({
                 </p>
             )}
 
-            {preview && (
-                <div className="overflow-hidden rounded-md border border-[var(--border)] bg-black">
-                    <video
-                        ref={videoRef}
-                        src={preview}
-                        className="max-h-[280px] w-full object-contain"
-                        controls
-                        playsInline
-                    />
-                    <p className="border-t border-[var(--border)] px-3 py-2 text-[11px] text-[var(--text-muted)]">
-                        Tap a skeleton below to inspect that frame; timestamps seek this clip.
-                    </p>
-                </div>
-            )}
-
             {result && (
                 <AnalyzeResultSummary
                     result={result}
@@ -58,8 +42,8 @@ export default function AnalyzeResultsContent({
                 />
             )}
 
-            {result?.recommendations && result.recommendations.length > 0 && (
-                <AnalyzeRecommendations recommendations={result.recommendations} />
+            {displayTimeline.length > 0 && (
+                <AnalyzeCourtHeatmap timeline={displayTimeline} />
             )}
 
             {displayTimeline.length > 0 && (
@@ -70,6 +54,10 @@ export default function AnalyzeResultsContent({
                     handleTimelineClick={handleTimelineClick}
                     openFrameAnalysis={openFrameAnalysis}
                 />
+            )}
+
+            {result?.recommendations && result.recommendations.length > 0 && (
+                <AnalyzeRecommendations recommendations={result.recommendations} />
             )}
         </div>
     )

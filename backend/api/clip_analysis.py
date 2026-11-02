@@ -11,6 +11,7 @@ import numpy as np
 import torch
 
 from api import state
+from api.coaching_text import clip_coaching_prompt, coaching_lines
 from api.config import MAX_VIDEO_DURATION_SECONDS
 from api.inference import run_stroke_model
 
@@ -272,21 +273,12 @@ def run_analysis_sync(temp_file: str) -> dict:
     recommendations = []
     if state.gemini_enabled and state.gemini_client:
         try:
-            tactical_context = (
-                f"- Stroke: {action_label} ({reco_subtype})\n"
-                f"- Technique: {reco_tech}\n"
-                f"- Placement: {reco_place}\n"
-                f"- Court Position: {reco_pos}\n"
-                f"- Tactical Intent: {reco_intent}\n"
-                f"- Quality: {numeric_quality}/10 ({quality_label})"
-            )
-            prompt = (
-                "You are a professional badminton coach. Analyze this stroke data and provide 3 concise technical tips:\n"
-                f"{tactical_context}\n\n"
-                "Format as single-line bullet points."
+            prompt = clip_coaching_prompt(
+                action_label, reco_subtype, confidence, metrics,
+                quality_label, numeric_quality, timeline,
             )
             response = state.gemini_client.models.generate_content(model=state.gemini_model_name, contents=prompt)
-            recommendations = [t.strip().lstrip("*-•").strip() for t in response.text.strip().split("\n") if t.strip()][:3]
+            recommendations = coaching_lines(response.text, 3)
         except Exception:
             recommendations = ["Keep your eye on the shuttle.", "Maintain a low center of gravity.", "Prepare your racket early."]
     else:
@@ -307,6 +299,263 @@ def run_analysis_sync(temp_file: str) -> dict:
         },
         "timeline": timeline,
     }
+
+
+_LEFT_ANKLE = 27
+_RIGHT_ANKLE = 28
+_LEFT_HIP = 23
+_RIGHT_HIP = 24
+
+
+def _largest_box(mask, width, height, min_fraction):
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return None
+    contour = max(contours, key=cv2.contourArea)
+    if cv2.contourArea(contour) < width * height * min_fraction:
+        return None
+    return cv2.boundingRect(contour)
+
+
+def _court_floor_box(frame):
+    """Playing surface in pixels: a green court, or a wood gym floor."""
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    height, width = frame.shape[:2]
+    green = cv2.inRange(hsv, np.array([30, 40, 40]), np.array([95, 255, 255]))
+    green = cv2.morphologyEx(green, cv2.MORPH_CLOSE, np.ones((11, 11), np.uint8))
+    box = _largest_box(green, width, height, 0.08)
+    if box is not None:
+        return box
+    wood = cv2.inRange(hsv, np.array([8, 15, 70]), np.array([36, 100, 255]))
+    wood[: int(height * 0.32), :] = 0
+    wood = cv2.morphologyEx(wood, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
+    return _largest_box(wood, width, height, 0.08)
+
+
+def _horizontal_court_lines(frame):
+    """Horizontal lines as (y, length), longest line kept when several sit together."""
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 50, 150)
+    height, width = frame.shape[:2]
+    raw = cv2.HoughLinesP(
+        edges, 1, np.pi / 180, threshold=60,
+        minLineLength=int(width * 0.28), maxLineGap=18,
+    )
+    if raw is None:
+        return []
+    rows = []
+    for x1, y1, x2, y2 in raw[:, 0]:
+        if abs(int(y2) - int(y1)) > 8:
+            continue
+        length = abs(int(x2) - int(x1))
+        if length < width * 0.28:
+            continue
+        rows.append((int(round((int(y1) + int(y2)) / 2)), length))
+    rows.sort()
+    clustered = []
+    for y, length in rows:
+        if clustered and abs(y - clustered[-1][0]) <= 12:
+            if length > clustered[-1][1]:
+                clustered[-1] = (y, length)
+        else:
+            clustered.append((y, length))
+    return clustered
+
+
+def _row_is_floor(frame, y):
+    """True when the pixels just below a line are wood or a green court, not wall or ceiling."""
+    height, width = frame.shape[:2]
+    sample_y = int(min(height - 2, max(0, y + 8)))
+    x1, x2 = int(width * 0.15), int(width * 0.85)
+    patch = frame[sample_y:sample_y + 2, x1:x2]
+    if patch.size == 0:
+        return False
+    hsv = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV)
+    hue = float(np.median(hsv[:, :, 0]))
+    sat = float(np.median(hsv[:, :, 1]))
+    val = float(np.median(hsv[:, :, 2]))
+    wood = 8 <= hue <= 40 and 12 <= sat <= 140 and val >= 70
+    green = 32 <= hue <= 95 and sat >= 40 and val >= 40
+    return wood or green
+
+
+def _court_reference(frame, foot_y):
+    """
+    Net, short-service line, and near baseline for a camera behind the player.
+    The service line is the floor line just in front of the feet.
+    """
+    height, width = frame.shape[:2]
+    if foot_y < height * 0.55:
+        return None
+    lines = _horizontal_court_lines(frame)
+    floor_lines = [
+        y for y, length in lines
+        if height * 0.45 < y < height * 0.96 and length >= width * 0.40 and _row_is_floor(frame, y)
+    ]
+    ahead = [y for y in floor_lines if foot_y - height * 0.14 < y < foot_y - 4]
+    if not ahead:
+        return None
+    service_y = max(ahead)
+    behind = [y for y in floor_lines if y > foot_y + 8]
+    base_y = max(behind) if behind else int(height * 0.94)
+    if base_y <= service_y + 20:
+        return None
+    # The front court is farther from the camera, so the same metres take fewer pixels.
+    front_px = max(28.0, (base_y - service_y) * (1.98 / 4.72) * 0.62)
+    net_y = service_y - front_px
+    return (float(net_y), float(service_y), float(base_y))
+
+
+def _depth_on_near_court(foot_y, reference):
+    """0 at the net, the short service line opens the front court, 1 at the near baseline."""
+    net_y, service_y, base_y = reference
+    if foot_y <= service_y:
+        span = (service_y - foot_y) / max(1.0, service_y - net_y)
+        return float(min(0.30, max(0.05, 0.22 - 0.17 * span)))
+    span = (foot_y - service_y) / max(1.0, base_y - service_y)
+    return float(min(1.0, max(0.36, 0.36 + 0.64 * span)))
+
+
+def _center_line_x(frame):
+    """Image x of the painted center line on the near court, when one is visible."""
+    height, width = frame.shape[:2]
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    y1 = int(height * 0.62)
+    green = (
+        (hsv[y1:, :, 0] >= 35) & (hsv[y1:, :, 0] <= 95)
+        & (hsv[y1:, :, 1] >= 40) & (hsv[y1:, :, 2] >= 50)
+    )
+    counts = green.sum(axis=0)
+    xs = np.where(counts >= 6)[0]
+    if len(xs) < 4:
+        return None
+    median = float(np.median(xs))
+    cluster = xs[np.abs(xs - median) < width * 0.04]
+    if len(cluster) < 4:
+        return None
+    return float(np.median(cluster))
+
+
+def _joint_px(landmarks, index, width, height):
+    by_id = {lm["id"]: lm for lm in landmarks}
+    lm = by_id.get(index)
+    if not lm:
+        return None
+    visibility = lm.get("visibility")
+    if isinstance(visibility, (int, float)) and visibility < 0.5:
+        return None
+    return lm["x"] * width, lm["y"] * height
+
+
+def _foot_on_court(landmarks, frame, box):
+    """Feet on the near half. x is left to right. y is 0 at the net and 1 at the baseline."""
+    if not landmarks or box is None:
+        return None
+    height, width = frame.shape[:2]
+    ankles = [pt for pt in (
+        _joint_px(landmarks, _LEFT_ANKLE, width, height),
+        _joint_px(landmarks, _RIGHT_ANKLE, width, height),
+    ) if pt]
+    if len(ankles) < 1:
+        return None
+    px = sum(pt[0] for pt in ankles) / len(ankles)
+    # The lead foot is the one closer to the net. A lunge has to count.
+    py = min(pt[1] for pt in ankles)
+    x, y, w, h = box
+    if w < 10 or h < 10:
+        return None
+    cx = (px - x) / w
+    if cx < -0.05 or cx > 1.05:
+        return None
+    return {
+        "x": float(min(1.0, max(0.0, cx))),
+        "ix": float(px / width),
+        "py": float(py),
+        "box_y": float((py - y) / h),
+    }
+
+
+def sample_rally_feet(temp_file: str):
+    """Foot position on the court floor across the rally, about 8 samples a second."""
+    cap = cv2.VideoCapture(temp_file)
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    fps = float(cap.get(cv2.CAP_PROP_FPS) or 0) or 30.0
+    if total <= 0:
+        cap.release()
+        return []
+    step = max(1, int(round(fps / 8)))
+    frames = []
+    for idx in range(0, total, step):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+        ok, frame = cap.read()
+        if ok:
+            frames.append((idx, frame))
+    cap.release()
+    if not frames or state.pose_estimator is None:
+        return []
+    boxes = [box for box in (_court_floor_box(frame) for _, frame in frames) if box]
+    if not boxes or state.pose_estimator is None:
+        return []
+    points = []
+    references = []
+    centers = []
+    for idx, frame in frames:
+        box = _court_floor_box(frame)
+        if box is None:
+            continue
+        detected = state.pose_estimator.process_frame(frame)
+        people = state.pose_estimator.get_landmarks_as_list(detected)
+        if not people:
+            continue
+        foot = _foot_on_court(people[0], frame, box)
+        if not foot:
+            continue
+        reference = _court_reference(frame, foot["py"])
+        if reference:
+            references.append(reference)
+        center = _center_line_x(frame)
+        if center is not None:
+            centers.append((center, frame.shape[1]))
+        foot["frame"] = int(idx)
+        points.append(foot)
+    reference = None
+    if references:
+        reference = tuple(
+            sorted(item[axis] for item in references)[len(references) // 2]
+            for axis in range(3)
+        )
+    center_frac = None
+    if centers:
+        width = centers[len(centers) // 2][1]
+        center_px = sorted(item[0] for item in centers)[len(centers) // 2]
+        center_frac = center_px / width
+    placed = []
+    for foot in points:
+        if reference:
+            depth = _depth_on_near_court(foot["py"], reference)
+        else:
+            depth = foot["box_y"]
+        if center_frac is not None:
+            half = max(center_frac, 1.0 - center_frac)
+            lateral = 0.5 + (foot["ix"] - center_frac) / (2.0 * half)
+        else:
+            lateral = foot["x"]
+        if depth < -0.05 or depth > 1.05 or lateral < -0.05 or lateral > 1.05:
+            continue
+        placed.append({
+            "x": float(min(1.0, max(0.0, lateral))),
+            "y": float(min(1.0, max(0.0, depth))),
+            "frame": foot["frame"],
+        })
+    kept = []
+    for index, foot in enumerate(placed):
+        if 0 < index < len(placed) - 1:
+            before = placed[index - 1]["y"]
+            after = placed[index + 1]["y"]
+            if abs(foot["y"] - before) > 0.28 and abs(foot["y"] - after) > 0.28:
+                continue
+        kept.append(foot)
+    return kept
 
 
 def _stream_load_and_pose_stage_sync(temp_file: str) -> dict:
@@ -405,6 +654,8 @@ async def run_analyze_stream_async(temp_file: str, video_hash: str):
         step_size_frames = int(30 * fps)
     window_size_frames = max(window_size_frames, 1)
 
+    rally_feet = await asyncio.to_thread(sample_rally_feet, temp_file)
+
     timeline = []
     window_index = 0
 
@@ -468,6 +719,11 @@ async def run_analyze_stream_async(temp_file: str, video_hash: str):
                 "intent": seg_results.get("intent", {"label": "None", "confidence": 0.0}),
                 "quality": seg_results.get("quality_label", "Developing"),
             },
+            "feet": [
+                {"x": point["x"], "y": point["y"]}
+                for point in rally_feet
+                if start <= point["frame"] < end
+            ],
         }
         timeline.append(event_data)
         yield event_data
@@ -517,25 +773,16 @@ async def run_analyze_stream_async(temp_file: str, video_hash: str):
     recommendations = []
     if state.gemini_enabled and state.gemini_client:
         try:
-            tactical_context = (
-                f"- Stroke: {action_label} ({reco_subtype})\n"
-                f"- Technique: {reco_tech}\n"
-                f"- Placement: {reco_place}\n"
-                f"- Court Position: {reco_pos}\n"
-                f"- Tactical Intent: {reco_intent}\n"
-                f"- Quality: {numeric_quality}/10 ({quality_label})"
-            )
-            prompt = (
-                "You are a professional badminton coach. Analyze this stroke data and provide 3 concise technical tips:\n"
-                f"{tactical_context}\n\n"
-                "Format as single-line bullet points."
+            prompt = clip_coaching_prompt(
+                action_label, reco_subtype, confidence, metrics,
+                quality_label, numeric_quality, timeline,
             )
             gemini_resp = await asyncio.to_thread(
                 state.gemini_client.models.generate_content,
                 model=state.gemini_model_name,
                 contents=prompt,
             )
-            recommendations = [t.strip().lstrip("*-•").strip() for t in gemini_resp.text.strip().split("\n") if t.strip()][:3]
+            recommendations = coaching_lines(gemini_resp.text, 3)
         except Exception:
             recommendations = ["Keep your eye on the shuttle.", "Maintain a low center of gravity.", "Prepare your racket early."]
     else:

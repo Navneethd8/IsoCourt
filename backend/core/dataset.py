@@ -73,6 +73,39 @@ def get_class_weights(
     return weights, name_to_weight
 
 
+# Label order is the inference contract. The annotation JSON is a training clip
+# index and is not required to serve the model.
+FINEBADMINTON_LABELS = {
+    "stroke_type": [
+        "Serve", "Clear", "Smash", "Drop", "Drive",
+        "Net_Shot", "Lob", "Defensive_Shot", "Other",
+    ],
+    "stroke_subtype": [
+        "None", "Short_Serve", "Flick_Serve", "High_Serve",
+        "Common_Smash", "Jump_Smash", "Full_Smash", "Stick_Smash", "Slice_Smash",
+        "Slice_Drop", "Stop_Drop", "Reverse_Slice_Drop", "Blocked_Drop",
+        "Flat_Lift", "High_Lift",
+        "Attacking_Clear", "Spinning_Net", "Flat_Drive", "High_Drive",
+        "High_Block", "Continuous_Net_Kills",
+    ],
+    "technique": ["Forehand", "Backhand", "Unknown"],
+    "placement": [
+        "Straight", "Cross-court", "Body_Hit", "Over_Head", "Passing_Shot",
+        "Wide", "Net_Fault", "Out", "Repeat", "Unknown",
+    ],
+    "position": [
+        "Mid_Front", "Mid_Court", "Mid_Back",
+        "Left_Front", "Left_Mid", "Left_Back",
+        "Right_Front", "Right_Mid", "Right_Back", "Unknown",
+    ],
+    "intent": [
+        "Intercept", "Passive", "Defensive", "To_Create_Depth",
+        "Move_To_Net", "Early_Net_Shot", "Deception", "Hesitation", "Seamlessly", "None",
+    ],
+    "quality": ["Developing", "Emerging", "Competent", "Proficient", "Advanced", "Expert", "Elite"],
+}
+
+
 class FineBadmintonDataset(Dataset):
     """
     Dataset class for FineBadminton data.
@@ -123,33 +156,7 @@ class FineBadmintonDataset(Dataset):
         # multiprocess workers do not share broken fd state across processes.
         self._video_caps: dict = {}
 
-        # Define Class Mappings
-        self.classes = {
-            "stroke_type": [
-                "Serve", "Clear", "Smash", "Drop", "Drive", 
-                "Net_Shot", "Lob", "Defensive_Shot", "Other"
-            ],
-            "stroke_subtype": [
-                "None", "Short_Serve", "Flick_Serve", "High_Serve",
-                "Common_Smash", "Jump_Smash", "Full_Smash", "Stick_Smash", "Slice_Smash",
-                "Slice_Drop", "Stop_Drop", "Reverse_Slice_Drop", "Blocked_Drop",
-                "Flat_Lift", "High_Lift",
-                "Attacking_Clear", "Spinning_Net", "Flat_Drive", "High_Drive",
-                "High_Block", "Continuous_Net_Kills",
-            ],
-            "technique": ["Forehand", "Backhand", "Unknown"],
-            "placement": ["Straight", "Cross-court", "Body_Hit", "Over_Head", "Passing_Shot", "Wide", "Net_Fault", "Out", "Repeat", "Unknown"],
-            "position": [
-                "Mid_Front", "Mid_Court", "Mid_Back", 
-                "Left_Front", "Left_Mid", "Left_Back",
-                "Right_Front", "Right_Mid", "Right_Back", "Unknown"
-            ],
-            "intent": [
-                "Intercept", "Passive", "Defensive", "To_Create_Depth", 
-                "Move_To_Net", "Early_Net_Shot", "Deception", "Hesitation", "Seamlessly", "None"
-            ],
-            "quality": ["Developing", "Emerging", "Competent", "Proficient", "Advanced", "Expert", "Elite"]
-        }
+        self.classes = {k: list(v) for k, v in FINEBADMINTON_LABELS.items()}
         
         # Build index maps
         self.maps = {k: {cls: i for i, cls in enumerate(v)} for k, v in self.classes.items()}

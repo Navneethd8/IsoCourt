@@ -153,8 +153,6 @@ export default function AnalyzePageContent({ controller }) {
                 loadingStep={loadingStep}
                 loadingSteps={loadingSteps}
                 displayTimeline={displayTimeline}
-                preview={preview}
-                videoRef={videoRef}
                 getQualityColor={getQualityColor}
                 getQualityBarColor={getQualityBarColor}
                 timelineHasPoseFrames={timelineHasPoseFrames}

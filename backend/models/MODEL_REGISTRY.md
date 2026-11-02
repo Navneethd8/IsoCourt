@@ -1,5 +1,7 @@
 # Model registry and inference selection
 
+Trainers named in this file live in the [JVC](https://github.com/Navneethd8/jvc) repo. This copy stays so the product can resolve the checkpoint it serves.
+
 This folder holds stroke-model weights and two pieces of configuration:
 
 

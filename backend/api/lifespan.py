@@ -12,12 +12,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api import state
 
-from core.dataset import FineBadmintonDataset
+from core.dataset import FINEBADMINTON_LABELS
 from core.pose_utils import PoseEstimator
 from core.badminton_detector import BadmintonPoseDetector
 from api.model_loader import load_registry, load_stroke_model, resolve_model_path
-from core.finebadminton_dataset_spec import resolve_inference_dataset_layout
-from core.model_registry import registry_meta_for_checkpoint
 
 load_dotenv()
 
@@ -48,37 +46,7 @@ async def app_lifespan(app: FastAPI):
             state.gemini_client = None
 
     registry = load_registry(MODELS_DIR)
-    path_preview = resolve_model_path(MODELS_DIR, registry)
-    reg_meta: dict = {}
-    if path_preview:
-        reg_meta = registry_meta_for_checkpoint(registry, path_preview)
-    layout = resolve_inference_dataset_layout(MODELS_DIR, reg_meta)
-    state.inference_dataset_id = layout["dataset_id"]
-    state.inference_dataset_source = str(layout.get("source") or "")
-    state.inference_frames_policy = str(layout.get("frames") or "")
-    state.inference_data_root = layout["data_root"]
-    state.inference_list_file = layout["list_file"]
-    print(
-        f"Inference dataset: {state.inference_dataset_id} "
-        f"(frames={state.inference_frames_policy})\n"
-        f"  data_root={state.inference_data_root}\n"
-        f"  list_file={state.inference_list_file}"
-    )
-
-    try:
-        temp_dataset = FineBadmintonDataset(state.inference_data_root, state.inference_list_file)
-        state.dataset_metadata = temp_dataset.classes
-    except Exception as e:
-        print(f"Warning: Could not load dataset metadata from 20K paths: {e}. Using fallback.")
-        state.dataset_metadata = {
-            "stroke_type": ["Serve", "Clear", "Smash", "Drop", "Drive", "Net_Shot", "Lob", "Defensive_Shot", "Other"],
-            "stroke_subtype": ["None", "Short_Serve", "Flick_Serve", "High_Serve", "Common_Smash", "Jump_Smash", "Full_Smash", "Stick_Smash", "Slice_Smash", "Slice_Drop", "Stop_Drop", "Reverse_Slice_Drop", "Blocked_Drop", "Flat_Lift", "High_Lift", "Attacking_Clear", "Spinning_Net", "Flat_Drive", "High_Drive", "High_Block", "Continuous_Net_Kills"],
-            "technique": ["Forehand", "Backhand", "Unknown"],
-            "placement": ["Straight", "Cross-court", "Body_Hit", "Over_Head", "Passing_Shot", "Wide", "Net_Fault", "Out", "Repeat", "Unknown"],
-            "position": ["Mid_Front", "Mid_Court", "Mid_Back", "Left_Front", "Left_Mid", "Left_Back", "Right_Front", "Right_Mid", "Right_Back", "Unknown"],
-            "intent": ["Intercept", "Passive", "Defensive", "To_Create_Depth", "Move_To_Net", "Early_Net_Shot", "Deception", "Hesitation", "Seamlessly", "None"],
-        }
-
+    state.dataset_metadata = {k: list(v) for k, v in FINEBADMINTON_LABELS.items()}
     task_classes = {k: len(v) for k, v in state.dataset_metadata.items()}
     task_classes["quality"] = 7
 

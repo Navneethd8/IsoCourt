@@ -184,11 +184,8 @@ export default function AnalyzeTimeline({
                 )}
             </span>
 
-            <p className="mb-3 text-[11px] text-[var(--text-muted)] md:hidden">
-                Tap a timestamp to jump in the video; tap a skeleton for frame analysis.
-            </p>
-            <p className="mb-3 hidden text-[11px] text-[var(--text-muted)] md:block">
-                Click a card to seek the video; click the skeleton for frame details and a coach tip.
+            <p className="mb-3 text-[11px] text-[var(--text-muted)]">
+                Tap a skeleton for that frame and a coach tip.
             </p>
 
             <div className="block md:hidden relative border-l app-timeline-rail ml-2 space-y-6 py-1 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">

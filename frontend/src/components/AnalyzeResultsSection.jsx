@@ -11,8 +11,6 @@ export default function AnalyzeResultsSection({
     loadingStep,
     loadingSteps,
     displayTimeline,
-    preview,
-    videoRef,
     getQualityColor,
     getQualityBarColor,
     timelineHasPoseFrames,
@@ -45,8 +43,6 @@ export default function AnalyzeResultsSection({
                     loadingStep={loadingStep}
                     loadingSteps={loadingSteps}
                     displayTimeline={displayTimeline}
-                    preview={preview}
-                    videoRef={videoRef}
                     getQualityColor={getQualityColor}
                     getQualityBarColor={getQualityBarColor}
                     timelineHasPoseFrames={timelineHasPoseFrames}

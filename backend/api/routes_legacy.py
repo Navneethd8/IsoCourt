@@ -12,6 +12,7 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
 from api import state
+from api.coaching_text import coaching_lines, frame_tip_prompt, quality_score
 from api.clip_analysis import run_analysis_sync, run_analyze_stream_async, sse_line
 from api.clip_jobs import clip_manager
 from api.config import MAX_CONCURRENT_JOBS, MAX_QUEUED_JOBS
@@ -133,20 +134,26 @@ async def frame_tip(body: dict):
         return {"tip": fallback, "cached": False}
 
     try:
-        prompt = (
-            "You are a professional badminton coach giving a quick tip to a player. "
-            "Based on this single frame analysis, give ONE concise coaching sentence (max 20 words):\n"
-            f"Stroke: {stroke} ({subtype}), Technique: {tech}, Placement: {place}, "
-            f"Position: {position}, Intent: {intent}, Quality: {quality}, Confidence: {conf:.0%}\n"
-            "Be specific and actionable. No preamble."
+        prompt = frame_tip_prompt(
+            stroke,
+            subtype,
+            float(conf or 0),
+            {
+                "technique": {"label": tech},
+                "placement": {"label": place},
+                "position": {"label": position},
+                "intent": {"label": intent},
+            },
+            quality,
+            quality_score(quality),
         )
         response = await asyncio.to_thread(
             state.gemini_client.models.generate_content,
             model=state.gemini_model_name,
             contents=prompt,
         )
-        tip = response.text.strip().lstrip("*-•").strip()
-        tip = tip.split("\n")[0].strip()
+        lines = coaching_lines(response.text, 1)
+        tip = lines[0] if lines else ""
         state._frame_tip_cache[cache_key] = tip
         return {"tip": tip, "cached": False}
     except Exception as e:

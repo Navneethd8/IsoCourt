@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useReducer } from 'react'
 import { track } from './analytics.js'
+import { plainCoachText } from './plainCoachText'
 
 const FRAME_INTERVAL_MS = 200
 
@@ -344,9 +345,10 @@ export function useLiveSession() {
                     pushChat('analysis', `${data.label} ${conf}`)
                     noteCoaching()
                 } else if (data.event === 'commentary') {
-                    if (data.text) {
-                        pushChat('coach', data.text)
-                        speak(data.text)
+                    const text = plainCoachText(data.text)
+                    if (text) {
+                        pushChat('coach', text)
+                        speak(text)
                         noteCoaching()
                     }
                 } else if (data.event === 'error') {

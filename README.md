@@ -30,56 +30,7 @@ The heart of the system processes the video through a sophisticated pipeline:
 ### 3. The Intelligence Layer (Google Gemini)
 The raw data from the model (e.g., "Backhand Clear, Mid-Back, Quality 4/7") is sent to **Gemini 1.5 Flash**. The LLM interprets these metrics to provide three personalized, technical coaching tips for every detected segment.
 
----
-
-## Cluster GPU training (nd17)
-
-Primary training target: **`nd17@is-aiclinic.ischool.uw.edu`**. Copy **`scripts/cluster.env.example`** to **`scripts/cluster.env`** (gitignored):
-
-```bash
-CLUSTER_HOST=nd17@is-aiclinic.ischool.uw.edu
-KEY_FILE=
-REMOTE_REPO='~/IsoCourt'
-REMOTE_DATA=/data/models/navneeth   # shared volume — edit after checking df -h on nd17
-```
-
-From the repo root:
-
-```bash
-./scripts/cluster/rsync_push_code.sh
-./scripts/cluster/rsync_push_data.sh    # FineBadminton-20K only; large, resumable
-./scripts/cluster/rsync_pull.sh
-```
-
-Full flow (symlink data volume, bootstrap, tmux): **[`scripts/cluster/README.md`](scripts/cluster/README.md)**.
-
----
-
-## EC2 GPU training (legacy)
-
-Use this for **`scripts/ec2/rsync_push.sh`** / **`scripts/ec2/rsync_pull.sh`**: create **`scripts/ec2.env`** at the repo root (that file is gitignored). Example:
-
-```bash
-EC2_HOST=ec2-user@54.202.106.114
-KEY_FILE=scripts/navneeth-keys.pem
-```
-
-Use an absolute path for `KEY_FILE` if you prefer (e.g. where your `.pem` actually lives). Then from the repo root:
-
-```bash
-./scripts/ec2/rsync_push.sh
-./scripts/ec2/rsync_pull.sh
-```
-
-Full flow (bootstrap, tmux, excludes): **[`scripts/ec2/README.md`](scripts/ec2/README.md)**. On a **fresh Ubuntu** GPU instance, install the NVIDIA stack and reboot once with **[`scripts/ec2/install_nvidia_driver_reboot.sh`](scripts/ec2/install_nvidia_driver_reboot.sh)** before `bootstrap_ec2.sh`.
-
-If this repository is public or shared, treat the host and key path as sensitive and prefer placeholders in committed docs.
-
----
-
-## Research & model experiments
-
-Full write-up of training standards, architecture comparison tables (pose vs no-pose ablations), external baselines (BST, TemPose, ST-GCN, SkateFormer), and novelty framing: **[`docs/RESEARCH.md`](docs/RESEARCH.md)**.
+Paper training, evaluation, and figures live in [JVC](https://github.com/Navneethd8/jvc) (`/Volumes/NewVolume/jvc` on the external drive). This repo is the product. Model classes the API still loads are copied in both places.
 
 ---
 
@@ -117,26 +68,3 @@ A single pass provides 7 distinct layers of analysis:
 2.  **Sliding Window**: Analysis happens in 1.5s windows with 0.75s overlaps, ensuring no action is missed between frames.
 3.  **Pose Synchronization**: MediaPipe Pose estimation is run in parallel to provide visual "Skeleton Analysis" for every detected hit.
 4.  **LLM Coaching**: The model's raw data is fed into **Google Gemini**, which acts as a virtual "Pro Coach" to provide 3 concise technical tips per segment.
-
----
-
-## 🚀 Training Strategy
-
-| Script | Purpose | Focus | Use Case |
-| :--- | :--- | :--- | :--- |
-| `train_timesformer.py` | TimeSformer | Divided space–time ViT + pose token | Same split/cache as other video trainers; default `--backbone vit` uses **ImageNet** `timm` ViT; tuning ranges in `pipelines/training/TIMESFORMER_HYPERPARAMS.md` |
-| `train_full.py` | Baseline | CNN-LSTM | Domain shift & court color invariance (Overnight) |
-| `fine_tune.py` | Domain Adaptation | Heads-Only | Custom court floor & lighting (20 mins) |
-
-### Approximate train time per epoch (reference)
-
-Calibrated on one Apple Silicon (MPS) box with the current dataset (~318 train clips, default batch size **4**). Your numbers will vary with GPU/CPU and batch size.
-
-| Model | ~min / epoch | ~time for 60 epochs |
-| :--- | :---: | :---: |
-| `train_full.py` (ResNet + LSTM) | **~3** | **~3 h** |
-| `train_timesformer.py` | scale partial runs | see below |
-
-**TimeSformer:** Smoke runs that only train **part** of an epoch (e.g. `--max-train-batches` ≈ **50** steps) were **~2.5–3 min** on the same machine. A **full** epoch scales about linearly with batches: multiply that wall time by `(batches_per_epoch / 50)`. With **~80** train batches (batch 4, this split), expect **~4–5 min/epoch** and **~4–5 h** for 60 epochs—not the much larger “laptop day” guess you get if you assume tens of minutes per epoch. If your tqdm total per epoch is much higher (smaller batch size or different sampler length), scale up accordingly.
-
-Install **`timm`** (ViT TimeSformer) via `pip install -r backend/requirements.txt`. Use **val loss** and **val type acc** in MLflow to compare runs (train/val split stays **video-level** only).

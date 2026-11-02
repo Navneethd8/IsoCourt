@@ -22,7 +22,6 @@ if _backend not in sys.path:
     sys.path.insert(0, _backend)
 
 from core.deploy_artifacts import sync_inference_category_for_deploy  # noqa: E402
-from core.finebadminton_dataset_spec import resolve_inference_dataset_layout  # noqa: E402
 from core.model_registry import (  # noqa: E402
     ARCHITECTURE_CATEGORIES,
     CATEGORY_GROUPS,
@@ -34,7 +33,6 @@ from core.model_registry import (  # noqa: E402
     promote_experiment_by_filename,
     promote_experiment_to_primary,
     primary_entry_for_category,
-    registry_meta_for_checkpoint,
     resolve_inference_category,
     resolve_inference_model_path,
     save_inference_selection,
@@ -62,14 +60,6 @@ def cmd_show(models_dir: str) -> int:
     print(f"inference_selection.json: {sel}")
     print(f"Resolved category: {cat}")
     print(f"Resolved checkpoint (primary only): {path}")
-    if path and cat:
-        meta = registry_meta_for_checkpoint(reg, path)
-        lay = resolve_inference_dataset_layout(models_dir, meta)
-        print(
-            f"Dataset: {lay['dataset_id']} | frames={lay['frames']}\n"
-            f"  list_file={lay['list_file']}\n"
-            f"  data_root={lay['data_root']}"
-        )
     return 0 if path and os.path.isfile(path) else 1
 
 

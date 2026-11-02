@@ -564,8 +564,6 @@ export function useAnalyzeController() {
         if (!videoRef.current) return
         const seconds = timestampToSeconds(timestamp)
         videoRef.current.currentTime = seconds
-        videoRef.current.play()
-        videoRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
 
     /** Seek clip, open pose lightbox, and request its coach tip. */
