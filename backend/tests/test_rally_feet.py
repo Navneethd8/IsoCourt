@@ -10,6 +10,7 @@ from api.clip_analysis import (
     _court_floor_box,
     _court_reference,
     _foot_on_court,
+    _horizontal_court_lines,
     _place_rally_feet,
     sample_rally_feet,
 )
@@ -149,6 +150,22 @@ def test_sample_rally_feet_does_not_accumulate_frames(tmp_path, monkeypatch):
     # A retained-frame list would still be holding the earlier samples here.
     assert cap.peak_held <= 2
     assert cap.peak_held < sampled / 4
+
+
+def test_horizontal_court_lines_accept_opencv4_and_opencv5_layouts(monkeypatch):
+    frame = np.zeros((80, 160, 3), dtype=np.uint8)
+    frame[:, :] = (40, 160, 40)
+    segment = np.array([0, 50, 159, 50], dtype=np.int32)
+    layouts = {
+        "opencv4": segment.reshape(1, 1, 4),
+        "opencv5": segment.reshape(1, 4),
+    }
+    found = {}
+    for name, raw in layouts.items():
+        monkeypatch.setattr("api.clip_analysis.cv2.HoughLinesP", lambda *args, **kwargs: raw)
+        found[name] = _horizontal_court_lines(frame)
+    assert found["opencv4"] == found["opencv5"]
+    assert found["opencv4"] == [(50, 159)]
 
 
 def test_sample_rally_feet_empty_without_pose_or_court(tmp_path, monkeypatch):

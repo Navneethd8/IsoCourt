@@ -1,5 +1,7 @@
 # Runtime-only deps for Hugging Face Spaces / production (no training, tests, or experiment tracking)
-opencv-python
+# 4.14 is the last OpenCV 4. Unpinned installs have resolved to 5.0.0.93 since 2 Jul 2026,
+# and that release returns HoughLinesP as (N, 4), which crashes the court-map line reader.
+opencv-python==4.14.0.94
 numpy
 pandas
 fastapi
