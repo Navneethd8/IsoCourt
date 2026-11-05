@@ -343,8 +343,9 @@ def _horizontal_court_lines(frame):
     )
     if raw is None:
         return []
+    # OpenCV 4 returns (N, 1, 4). OpenCV 5 returns (N, 4).
     rows = []
-    for x1, y1, x2, y2 in raw[:, 0]:
+    for x1, y1, x2, y2 in np.asarray(raw).reshape(-1, 4):
         if abs(int(y2) - int(y1)) > 8:
             continue
         length = abs(int(x2) - int(x1))
@@ -475,49 +476,8 @@ def _foot_on_court(landmarks, frame, box):
     }
 
 
-def sample_rally_feet(temp_file: str):
-    """Foot position on the court floor across the rally, about 8 samples a second."""
-    cap = cv2.VideoCapture(temp_file)
-    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
-    fps = float(cap.get(cv2.CAP_PROP_FPS) or 0) or 30.0
-    if total <= 0:
-        cap.release()
-        return []
-    step = max(1, int(round(fps / 8)))
-    frames = []
-    for idx in range(0, total, step):
-        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-        ok, frame = cap.read()
-        if ok:
-            frames.append((idx, frame))
-    cap.release()
-    if not frames or state.pose_estimator is None:
-        return []
-    boxes = [box for box in (_court_floor_box(frame) for _, frame in frames) if box]
-    if not boxes or state.pose_estimator is None:
-        return []
-    points = []
-    references = []
-    centers = []
-    for idx, frame in frames:
-        box = _court_floor_box(frame)
-        if box is None:
-            continue
-        detected = state.pose_estimator.process_frame(frame)
-        people = state.pose_estimator.get_landmarks_as_list(detected)
-        if not people:
-            continue
-        foot = _foot_on_court(people[0], frame, box)
-        if not foot:
-            continue
-        reference = _court_reference(frame, foot["py"])
-        if reference:
-            references.append(reference)
-        center = _center_line_x(frame)
-        if center is not None:
-            centers.append((center, frame.shape[1]))
-        foot["frame"] = int(idx)
-        points.append(foot)
+def _place_rally_feet(points, references, centers):
+    """Map per-frame foot samples onto the court. Inputs are small scalars, not images."""
     reference = None
     if references:
         reference = tuple(
@@ -556,6 +516,69 @@ def sample_rally_feet(temp_file: str):
                 continue
         kept.append(foot)
     return kept
+
+
+def _observe_rally_frame(frame, idx):
+    """Score one frame. Returns (foot or None, reference or None, center or None, court_seen)."""
+    box = _court_floor_box(frame)
+    if box is None:
+        return None, None, None, False
+    detected = state.pose_estimator.process_frame(frame)
+    people = state.pose_estimator.get_landmarks_as_list(detected)
+    if not people:
+        return None, None, None, True
+    foot = _foot_on_court(people[0], frame, box)
+    if not foot:
+        return None, None, None, True
+    reference = _court_reference(frame, foot["py"])
+    center = _center_line_x(frame)
+    center_item = (center, frame.shape[1]) if center is not None else None
+    foot["frame"] = int(idx)
+    return foot, reference, center_item, True
+
+
+def sample_rally_feet(temp_file: str):
+    """Foot position on the court floor across the rally, about 8 samples a second.
+
+    Each sampled frame is scored and then released. Only foot positions and a few
+    court scalars are kept, so memory stays flat as the clip gets longer.
+    """
+    if state.pose_estimator is None:
+        return []
+    cap = cv2.VideoCapture(temp_file)
+    try:
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        fps = float(cap.get(cv2.CAP_PROP_FPS) or 0) or 30.0
+        if total <= 0:
+            return []
+        step = max(1, int(round(fps / 8)))
+        points = []
+        references = []
+        centers = []
+        saw_court = False
+        for idx in range(0, total, step):
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            ok, frame = cap.read()
+            if not ok or frame is None:
+                continue
+            try:
+                foot, reference, center_item, court_seen = _observe_rally_frame(frame, idx)
+            finally:
+                del frame
+            if court_seen:
+                saw_court = True
+            if foot is None:
+                continue
+            if reference is not None:
+                references.append(reference)
+            if center_item is not None:
+                centers.append(center_item)
+            points.append(foot)
+        if not saw_court:
+            return []
+        return _place_rally_feet(points, references, centers)
+    finally:
+        cap.release()
 
 
 def _stream_load_and_pose_stage_sync(temp_file: str) -> dict:
