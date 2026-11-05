@@ -332,6 +332,20 @@ def _court_floor_box(frame):
     return _largest_box(wood, width, height, 0.08)
 
 
+def _hough_segments(raw):
+    """(x1, y1, x2, y2) rows from HoughLinesP.
+
+    OpenCV 5 returns shape (N, 4). OpenCV 4 returned (N, 1, 4); drop that
+    extra axis when it is still present.
+    """
+    if raw is None:
+        return np.empty((0, 4), dtype=np.int32)
+    lines = np.asarray(raw)
+    if lines.ndim == 3:
+        lines = lines[:, 0, :]
+    return np.ascontiguousarray(lines.reshape(-1, 4))
+
+
 def _horizontal_court_lines(frame):
     """Horizontal lines as (y, length), longest line kept when several sit together."""
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -341,11 +355,8 @@ def _horizontal_court_lines(frame):
         edges, 1, np.pi / 180, threshold=60,
         minLineLength=int(width * 0.28), maxLineGap=18,
     )
-    if raw is None:
-        return []
-    # OpenCV 4 returns (N, 1, 4). OpenCV 5 returns (N, 4).
     rows = []
-    for x1, y1, x2, y2 in np.asarray(raw).reshape(-1, 4):
+    for x1, y1, x2, y2 in _hough_segments(raw):
         if abs(int(y2) - int(y1)) > 8:
             continue
         length = abs(int(x2) - int(x1))

@@ -11,6 +11,7 @@ from api.clip_analysis import (
     _court_reference,
     _foot_on_court,
     _horizontal_court_lines,
+    _hough_segments,
     _place_rally_feet,
     sample_rally_feet,
 )
@@ -152,20 +153,29 @@ def test_sample_rally_feet_does_not_accumulate_frames(tmp_path, monkeypatch):
     assert cap.peak_held < sampled / 4
 
 
-def test_horizontal_court_lines_accept_opencv4_and_opencv5_layouts(monkeypatch):
+def test_hough_segments_use_opencv5_rows_and_accept_opencv4():
+    segment = np.array([[0, 50, 159, 50], [3, 12, 40, 12]], dtype=np.int32)
+    native = _hough_segments(segment)  # OpenCV 5: (N, 4)
+    legacy = _hough_segments(segment.reshape(2, 1, 4))  # OpenCV 4: (N, 1, 4)
+    assert native.shape == (2, 4)
+    assert np.array_equal(native, segment)
+    assert np.array_equal(legacy, segment)
+    assert _hough_segments(None).shape == (0, 4)
+
+
+def test_installed_opencv_houghlinesp_is_five_layout():
+    assert cv2.__version__.split(".", 1)[0] == "5"
+    image = np.zeros((80, 160), dtype=np.uint8)
+    cv2.line(image, (0, 40), (159, 40), 255, 2)
+    raw = cv2.HoughLinesP(image, 1, np.pi / 180, threshold=20, minLineLength=40, maxLineGap=4)
+    assert raw is not None
+    assert raw.ndim == 2 and raw.shape[1] == 4
     frame = np.zeros((80, 160, 3), dtype=np.uint8)
     frame[:, :] = (40, 160, 40)
-    segment = np.array([0, 50, 159, 50], dtype=np.int32)
-    layouts = {
-        "opencv4": segment.reshape(1, 1, 4),
-        "opencv5": segment.reshape(1, 4),
-    }
-    found = {}
-    for name, raw in layouts.items():
-        monkeypatch.setattr("api.clip_analysis.cv2.HoughLinesP", lambda *args, **kwargs: raw)
-        found[name] = _horizontal_court_lines(frame)
-    assert found["opencv4"] == found["opencv5"]
-    assert found["opencv4"] == [(50, 159)]
+    cv2.line(frame, (0, 40), (159, 40), (255, 255, 255), 2)
+    lines = _horizontal_court_lines(frame)
+    assert lines
+    assert any(abs(y - 40) <= 2 for y, _length in lines)
 
 
 def test_sample_rally_feet_empty_without_pose_or_court(tmp_path, monkeypatch):
