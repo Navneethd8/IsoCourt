@@ -1,4 +1,6 @@
-opencv-python
+# OpenCV 5 is the API this tree is written for. 5.0.0.93 is the first 5.x wheel
+# and the one an unpinned install has selected since 2 Jul 2026. <6 blocks the next major.
+opencv-python>=5.0.0.93,<6
 numpy
 pandas
 fastapi
