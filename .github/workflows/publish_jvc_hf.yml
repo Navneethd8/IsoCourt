@@ -1,0 +1,31 @@
+name: Publish JVC model to Hugging Face
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: Upload JVC checkpoint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (with LFS)
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install upload dependencies
+        run: |
+          pip install --upgrade pip
+          pip install huggingface_hub
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Publish navneethdg/JVC
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+        run: python scripts/publish_jvc_to_hf.py
